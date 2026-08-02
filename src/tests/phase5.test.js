@@ -5,6 +5,7 @@ import {
   getPlanCompletionLabel,
   getPrimaryDashboardAction,
 } from "../lib/uiExperience.js";
+import { getLessonMasteryBlockers } from "../lib/resultCoaching.js";
 
 test("page metadata gives every primary route a concise accessible label", () => {
   assert.equal(getPageMeta("/").title, "Today");
@@ -22,4 +23,17 @@ test("dashboard prioritises setup, reviews, lessons, then benchmarks", () => {
 test("daily goal labels stay simple and action-oriented", () => {
   assert.equal(getPlanCompletionLabel({ completedMinutes: 4, goalMinutes: 10 }), "6 minutes remaining");
   assert.equal(getPlanCompletionLabel({ completedMinutes: 12, goalMinutes: 10 }), "Daily goal complete");
+});
+
+test("single remaining guided exercise uses correct singular guidance", () => {
+  const blockers = getLessonMasteryBlockers({
+    exerciseResults: {
+      first: { passed: true },
+      second: { passed: true },
+    },
+  }, {
+    passAccuracy: 94,
+    exercises: [{ id: "first" }, { id: "second" }, { id: "third" }],
+  });
+  assert.equal(blockers[0].detail, "1 exercise still needs a passing result.");
 });

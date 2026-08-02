@@ -33,7 +33,7 @@ export function WelcomePage() {
       profile: { name: name.trim() || "Learner", experience, primaryGoal },
       settings: { dailyGoalMinutes },
     });
-    navigate(takeDiagnostic ? "/diagnostic" : "/");
+    navigate(takeDiagnostic ? "/diagnostic" : "/learn/home-f-j");
   };
 
   return (

@@ -77,7 +77,8 @@ function LessonPageContent({ lessonId }) {
     [data.progress.lessonMastery, lesson],
   );
   const masteryState = getEffectiveMasteryState(currentMastery);
-  const reviewAttempt = alreadyComplete || [MASTERY_STATES.MASTERED, MASTERY_STATES.REVIEW_DUE].includes(masteryState);
+  const [reviewAttempt] = useState(() => alreadyComplete
+    || [MASTERY_STATES.MASTERED, MASTERY_STATES.REVIEW_DUE].includes(masteryState));
   const restoredSession = location.state?.lessonSession ?? null;
   const remediation = location.state?.remediation ?? null;
 

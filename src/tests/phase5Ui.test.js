@@ -162,6 +162,13 @@ test("lesson mode, length, and fresh-text controls stay attached to the typing w
   assert.match(workspace, /\{sessionControls\}/);
 });
 
+test("beginner onboarding opens lesson one and first-pass mastery does not switch to review mid-session", () => {
+  const welcome = source("pages/WelcomePage.jsx");
+  const lesson = source("pages/LessonPage.jsx");
+  assert.match(welcome, /navigate\(takeDiagnostic \? "\/diagnostic" : "\/learn\/home-f-j"\)/);
+  assert.match(lesson, /const \[reviewAttempt\] = useState\(\(\) => alreadyComplete/);
+});
+
 test("technical storage controls are collapsed and account errors use alert semantics", () => {
   const settings = source("pages/SettingsPage.jsx");
   const account = source("pages/AccountPage.jsx");
