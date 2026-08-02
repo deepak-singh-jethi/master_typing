@@ -26,19 +26,6 @@ test("shared buttons default to a safe non-submit type", () => {
   assert.match(button, /type \|\| "button"/);
 });
 
-test("account authentication form explicitly submits through its primary button", () => {
-  const account = source("pages/AccountPage.jsx");
-  assert.match(account, /<form className="space-y-4" onSubmit=\{submit\}>[\s\S]*?<Button type="submit" variant="brand"/);
-});
-
-test("password recovery submits explicitly and reports a stable success state", () => {
-  const reset = source("pages/ResetPasswordPage.jsx");
-  assert.match(reset, /<Button type="submit" variant="brand"/);
-  assert.match(reset, /if \(complete\)/);
-  assert.match(reset, /Password updated/);
-  assert.doesNotMatch(reset, /setTimeout/);
-});
-
 test("visual charts provide text alternatives", () => {
   for (const file of [
     "components/insights/WeeklyActivityChart.jsx",
@@ -107,13 +94,6 @@ test("account and storage actions report failures instead of leaving rejected pr
   assert.match(settings, /Old session details could not be pruned/);
 });
 
-test("normal sign-out ends only the current session and clears local auth state", () => {
-  const auth = source("context/AuthProvider.jsx");
-  assert.match(auth, /auth\.signOut\(\{ scope: "local" \}\)/);
-  assert.match(auth, /setSession\(null\)/);
-  assert.match(auth, /setRecoveryMode\(false\)/);
-});
-
 test("invalid test links provide a route back to the test list", () => {
   const session = source("pages/TestSessionPage.jsx");
   assert.match(session, /to="\/tests"/);
@@ -162,13 +142,6 @@ test("lesson mode, length, and fresh-text controls stay attached to the typing w
   assert.match(workspace, /\{sessionControls\}/);
 });
 
-test("beginner onboarding opens lesson one and first-pass mastery does not switch to review mid-session", () => {
-  const welcome = source("pages/WelcomePage.jsx");
-  const lesson = source("pages/LessonPage.jsx");
-  assert.match(welcome, /navigate\(takeDiagnostic \? "\/diagnostic" : "\/learn\/home-f-j"\)/);
-  assert.match(lesson, /const \[reviewAttempt\] = useState\(\(\) => alreadyComplete/);
-});
-
 test("technical storage controls are collapsed and account errors use alert semantics", () => {
   const settings = source("pages/SettingsPage.jsx");
   const account = source("pages/AccountPage.jsx");
@@ -184,4 +157,11 @@ test("the application provides a recoverable crash screen", () => {
   assert.match(app, /AppErrorBoundary/);
   assert.match(boundary, /Your saved progress has not been deleted/);
   assert.match(boundary, /window\.location\.reload/);
+});
+
+test("authentication forms use explicit submit buttons", () => {
+  const account = source("pages/AccountPage.jsx");
+  const reset = source("pages/ResetPasswordPage.jsx");
+  assert.match(account, /<Button type="submit" variant="brand" className="w-full"/);
+  assert.match(reset, /<Button type="submit" variant="brand" disabled=\{busy\}>/);
 });

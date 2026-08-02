@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, KeyRound } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { AlertTriangle, KeyRound } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { Card } from "@/components/common/Card";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -8,11 +8,11 @@ import { useAuth } from "@/hooks/useAuth.js";
 
 export function ResetPasswordPage() {
   const { loading, recoveryMode, updatePassword } = useAuth();
+  const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [complete, setComplete] = useState(false);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -24,9 +24,8 @@ export function ResetPasswordPage() {
     setMessage("");
     try {
       await updatePassword(password);
-      setPassword("");
-      setConfirmation("");
-      setComplete(true);
+      setMessage("Password updated successfully.");
+      window.setTimeout(() => navigate("/account"), 800);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -36,21 +35,6 @@ export function ResetPasswordPage() {
 
   if (loading) {
     return <div className="grid min-h-[40vh] place-items-center text-sm text-slate-500">Validating the recovery link…</div>;
-  }
-
-  if (complete) {
-    return (
-      <div className="space-y-8">
-        <PageHeader eyebrow="Account recovery" title="Password updated" description="Your new password is active and this recovery link cannot be used again." />
-        <Card className="max-w-xl p-6">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 size-5 text-emerald-600" />
-            <p role="status" className="text-sm leading-6 text-slate-600 dark:text-slate-300">You can continue to your account. If you are asked to sign in again, use the new password.</p>
-          </div>
-          <Button as={Link} to="/account" variant="brand" className="mt-5">Continue to account</Button>
-        </Card>
-      </div>
-    );
   }
 
   if (!recoveryMode) {
@@ -77,7 +61,7 @@ export function ResetPasswordPage() {
           <PasswordField label="Confirm new password" value={confirmation} onChange={setConfirmation} autoComplete="new-password" />
           <Button type="submit" variant="brand" disabled={busy}><KeyRound className="size-4" />{busy ? "Updating…" : "Update password"}</Button>
         </form>
-        {message && <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{message}</p>}
+        {message && <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">{message}</p>}
       </Card>
     </div>
   );

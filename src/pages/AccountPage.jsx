@@ -22,13 +22,6 @@ export function AccountPage() {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
-  const selectMode = (nextMode) => {
-    setMode(nextMode);
-    setPassword("");
-    setMessage("");
-    setMessageTone("success");
-  };
-
   const submit = async (event) => {
     event.preventDefault();
     setBusy(true);
@@ -39,13 +32,30 @@ export function AccountPage() {
         const result = await auth.signUp({ email, password, displayName });
         setMessage(result.session
           ? "Account created. Your local progress is being moved to the cloud."
-          : "Account created. Check your email and open the confirmation link, then return here to sign in.");
-        setPassword("");
+          : "Account created. Check your email if confirmation is enabled in Supabase.");
       } else {
         await auth.signIn({ email, password });
         setMessage("Signed in. Your progress is synchronising.");
-        setPassword("");
       }
+    } catch (error) {
+      setMessage(error.message);
+      setMessageTone("error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const forgotPassword = async () => {
+    if (!email.trim()) {
+      setMessage("Enter your email first.");
+      setMessageTone("error");
+      return;
+    }
+    setBusy(true);
+    try {
+      await auth.sendPasswordReset(email);
+      setMessage("Password reset email sent. Check your inbox.");
+      setMessageTone("success");
     } catch (error) {
       setMessage(error.message);
       setMessageTone("error");
@@ -59,8 +69,6 @@ export function AccountPage() {
     setAccountError("");
     try {
       await auth.signOut();
-      setMessage("Signed out on this device.");
-      setMessageTone("success");
     } catch (error) {
       setAccountError(error.message || "Unable to sign out. Try again.");
     } finally {
@@ -158,8 +166,8 @@ export function AccountPage() {
       <div className="grid max-w-5xl gap-6 lg:grid-cols-[1fr_0.8fr]">
         <Card className="p-6">
           <div role="group" aria-label="Account action" className="mb-6 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
-            <button type="button" aria-pressed={mode === "signin"} onClick={() => selectMode("signin")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold ${mode === "signin" ? "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white" : "text-slate-500"}`}>Sign in</button>
-            <button type="button" aria-pressed={mode === "signup"} onClick={() => selectMode("signup")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold ${mode === "signup" ? "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white" : "text-slate-500"}`}>Create account</button>
+            <button type="button" aria-pressed={mode === "signin"} onClick={() => setMode("signin")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold ${mode === "signin" ? "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white" : "text-slate-500"}`}>Sign in</button>
+            <button type="button" aria-pressed={mode === "signup"} onClick={() => setMode("signup")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold ${mode === "signup" ? "bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white" : "text-slate-500"}`}>Create account</button>
           </div>
           <form className="space-y-4" onSubmit={submit}>
             {mode === "signup" && <Field label="Display name"><input value={displayName} autoComplete="name" onChange={(e) => setDisplayName(e.target.value.slice(0, 40))} required className={inputClass} /></Field>}
@@ -167,7 +175,7 @@ export function AccountPage() {
             <Field label="Password"><input type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required className={inputClass} /></Field>
             <Button type="submit" variant="brand" className="w-full" disabled={busy}>{mode === "signup" ? <UserPlus className="size-4" /> : <LogIn className="size-4" />}{busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}</Button>
           </form>
-          {mode === "signin" && <Link to="/forgot-password" className="mt-4 inline-flex text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-300">Forgot password?</Link>}
+          {mode === "signin" && <button type="button" onClick={forgotPassword} disabled={busy} className="mt-4 text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-300">Forgot password?</button>}
           {message && <p role={messageTone === "error" ? "alert" : "status"} aria-live="polite" className={messageTone === "error" ? "mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300" : "mt-4 rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200"}>{message}</p>}
         </Card>
         <Card className="p-6">
