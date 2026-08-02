@@ -284,7 +284,7 @@ export function getLessonMasteryBlockers(mastery = {}, lesson, { review = false 
       passed: requiredIds.length > 0 && passedCount >= requiredIds.length,
       detail: passedCount >= requiredIds.length
         ? "Every required exercise has passed."
-        : `${requiredIds.length - passedCount} exercise${requiredIds.length - passedCount === 1 ? "" : "s"} still need a passing result.`,
+        : `${requiredIds.length - passedCount} exercise${requiredIds.length - passedCount === 1 ? "" : "s"} still need${requiredIds.length - passedCount === 1 ? "s" : ""} a passing result.`,
     },
   ];
 

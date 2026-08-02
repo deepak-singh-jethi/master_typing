@@ -158,3 +158,10 @@ test("the application provides a recoverable crash screen", () => {
   assert.match(boundary, /Your saved progress has not been deleted/);
   assert.match(boundary, /window\.location\.reload/);
 });
+
+test("authentication forms use explicit submit buttons", () => {
+  const account = source("pages/AccountPage.jsx");
+  const reset = source("pages/ResetPasswordPage.jsx");
+  assert.match(account, /<Button type="submit" variant="brand" className="w-full"/);
+  assert.match(reset, /<Button type="submit" variant="brand" disabled=\{busy\}>/);
+});

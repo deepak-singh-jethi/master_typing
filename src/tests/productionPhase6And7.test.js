@@ -39,6 +39,12 @@ test("auth initialization failures remain visible and recoverable", () => {
   assert.match(banner, /Retry account service/);
 });
 
+test("hosted sign-up and password recovery supply explicit safe return URLs", () => {
+  const auth = read("src/context/AuthProvider.jsx");
+  assert.match(auth, /emailRedirectTo/);
+  assert.match(auth, /resetPasswordForEmail\(email\.trim\(\), \{ redirectTo \}\)/);
+});
+
 test("release engineering files enforce CI, immutable build identity, headers, and safe examples", () => {
   for (const path of [".github/workflows/ci.yml", ".nvmrc", "vercel.json", "public/_headers", ".env.staging.example", ".env.production.example"]) {
     assert.equal(existsSync(new URL(path, root)), true, `${path} must exist`);

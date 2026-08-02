@@ -173,7 +173,7 @@ export function AccountPage() {
             {mode === "signup" && <Field label="Display name"><input value={displayName} autoComplete="name" onChange={(e) => setDisplayName(e.target.value.slice(0, 40))} required className={inputClass} /></Field>}
             <Field label="Email"><input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputClass} /></Field>
             <Field label="Password"><input type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required className={inputClass} /></Field>
-            <Button variant="brand" className="w-full" disabled={busy}>{mode === "signup" ? <UserPlus className="size-4" /> : <LogIn className="size-4" />}{busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}</Button>
+            <Button type="submit" variant="brand" className="w-full" disabled={busy}>{mode === "signup" ? <UserPlus className="size-4" /> : <LogIn className="size-4" />}{busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}</Button>
           </form>
           {mode === "signin" && <button type="button" onClick={forgotPassword} disabled={busy} className="mt-4 text-sm font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-300">Forgot password?</button>}
           {message && <p role={messageTone === "error" ? "alert" : "status"} aria-live="polite" className={messageTone === "error" ? "mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300" : "mt-4 rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200"}>{message}</p>}

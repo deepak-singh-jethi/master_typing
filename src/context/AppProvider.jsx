@@ -382,8 +382,11 @@ export function AppProvider({ children }) {
       let accountData = localAccount;
       let migratedGuest = false;
       const sessionIdsToSync = new Set(pendingBeforePull.sessionIds.map(String));
+      const sessionIdsCreatedDuringPull = new Set();
       try {
-        const cloudData = await pullCloudData(userId, localAccount);
+        const cloudData = await pullCloudData(userId, localAccount, {
+          pendingSessionIds: pendingBeforePull.sessionIds,
+        });
         if (generation !== reconcileGenerationRef.current || user?.id !== userId) return;
         const latestLocal = workspaceRef.current.userId === userId
           ? workspaceRef.current.data
@@ -394,10 +397,14 @@ export function AppProvider({ children }) {
         latestLocal.attempts.forEach((attempt) => {
           if (!localAccount.attempts.some((item) => String(item.id) === String(attempt.id))) {
             sessionIdsToSync.add(String(attempt.id));
+            sessionIdsCreatedDuringPull.add(String(attempt.id));
           }
         });
         if (cloudData) accountData = changedDuringPull || hasPendingLocalChanges
-          ? mergeAccountLocalData(cloudData, latestLocal, { preferLatestSnapshot: true })
+          ? mergeAccountLocalData(cloudData, latestLocal, {
+              preferLatestSnapshot: true,
+              additiveSessionIds: [...sessionIdsCreatedDuringPull],
+            })
           : cloudData;
         else {
           accountData = latestLocal;
@@ -449,9 +456,13 @@ export function AppProvider({ children }) {
         latestLocal.attempts.forEach((attempt) => {
           if (!localAccount.attempts.some((item) => String(item.id) === String(attempt.id))) {
             sessionIdsToSync.add(String(attempt.id));
+            sessionIdsCreatedDuringPull.add(String(attempt.id));
           }
         });
-        accountData = mergeAccountLocalData(accountData, latestLocal, { preferLatestSnapshot: true });
+        accountData = mergeAccountLocalData(accountData, latestLocal, {
+          preferLatestSnapshot: true,
+          additiveSessionIds: [...sessionIdsCreatedDuringPull],
+        });
         saveAppData(accountData, userId);
         setWorkspace({ userId, data: accountData });
         enqueueSync(userId, {

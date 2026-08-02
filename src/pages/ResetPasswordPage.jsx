@@ -59,7 +59,7 @@ export function ResetPasswordPage() {
         <form onSubmit={submit} className="space-y-4">
           <PasswordField label="New password" value={password} onChange={setPassword} autoComplete="new-password" />
           <PasswordField label="Confirm new password" value={confirmation} onChange={setConfirmation} autoComplete="new-password" />
-          <Button variant="brand" disabled={busy}><KeyRound className="size-4" />{busy ? "Updating…" : "Update password"}</Button>
+          <Button type="submit" variant="brand" disabled={busy}><KeyRound className="size-4" />{busy ? "Updating…" : "Update password"}</Button>
         </form>
         {message && <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">{message}</p>}
       </Card>
