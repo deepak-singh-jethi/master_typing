@@ -129,6 +129,10 @@ const emailAndFormTexts = [
   `Subject: Leave Request. I request leave from 12/08/${PRACTICE_YEAR} to 14/08/${PRACTICE_YEAR}.`,
   "Please verify the uploaded certificate and confirm whether the file is clear and complete.",
   "Ticket ID: SUP-9081. Issue: login error. Priority: normal. Status: open.",
+  "Forward learner@example.com to help-desk@example.com, archive-team@example.com, and records@example.com under case TM-2054.",
+  "Send form-21 to records@example.com, form-22 to review@example.com, form-23 to audit@example.com, and form-24 to admin@example.com.",
+  "Confirm that user-one@example.com, user-two@example.com, and user-three@example.com match records TM-301 and TM-302.",
+  "Use report-01.pdf for team@example.com, report-02.pdf for manager@example.com, and report-03.pdf for audit@example.com before ticket TM-903.",
 ];
 
 const assessmentTexts = [
@@ -740,7 +744,14 @@ function getAdvancedLessonText(lesson, targetWords, seed, exercise = null) {
       bank = unique([...bank, ...naturalParagraphs]);
     }
   }
-  const coverageRequirements = getLessonCoverageRequirements({ lesson, exercise, targetWords });
+  const coverageRequirements = getLessonCoverageRequirements({ lesson, exercise, targetWords })
+    .map((requirement) => ({
+      ...requirement,
+      minimum: Math.ceil(
+        requirement.minimum
+        * Number(lesson.coveragePracticeMultipliers?.[requirement.target] ?? 1),
+      ),
+    }));
   const coverageTargets = coverageRequirements.map((item) => item.target);
   const focusKeys = coverageTargets.filter((key) => key.length === 1);
   const focusBigrams = coverageTargets.filter((key) => key.length === 2);

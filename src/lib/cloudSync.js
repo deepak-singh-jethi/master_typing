@@ -36,6 +36,49 @@ function weightedAverage(firstAverage, firstCount, secondAverage, secondCount) {
   return ((number(firstAverage) * number(firstCount)) + (number(secondAverage) * number(secondCount))) / total;
 }
 
+function reconcileDistinctAttemptProgress(baseProgress = {}, localProgress = {}, localAttempts = [], attemptIds = []) {
+  const requestedIds = new Set(array(attemptIds).map(String));
+  const distinctAttempts = array(localAttempts).filter((attempt) => attempt?.id && requestedIds.has(String(attempt.id)));
+  if (!distinctAttempts.length) return object(baseProgress);
+
+  const addedCount = distinctAttempts.length;
+  const localCount = number(localProgress.totalSessions);
+  const localBaseCount = Math.max(0, localCount - addedCount);
+  const baseCount = number(baseProgress.totalSessions);
+  const useLocalBase = localBaseCount > baseCount;
+  const foundationCount = useLocalBase ? localBaseCount : baseCount;
+  const sum = (field) => distinctAttempts.reduce((total, attempt) => total + number(attempt[field]), 0);
+  const reconcileTotal = (field, attemptField) => {
+    const localBaseValue = Math.max(0, number(localProgress[field]) - sum(attemptField));
+    return Math.max(number(baseProgress[field]), localBaseValue) + sum(attemptField);
+  };
+  const reconcileAverage = (field, attemptField) => {
+    const addedSum = sum(attemptField);
+    const localBaseSum = Math.max(0, (number(localProgress[field]) * localCount) - addedSum);
+    const foundationSum = useLocalBase
+      ? localBaseSum
+      : number(baseProgress[field]) * baseCount;
+    return foundationCount + addedCount
+      ? (foundationSum + addedSum) / (foundationCount + addedCount)
+      : 0;
+  };
+
+  return {
+    ...object(baseProgress),
+    totalPracticeSeconds: reconcileTotal("totalPracticeSeconds", "durationSeconds"),
+    totalSessions: foundationCount + addedCount,
+    totalCharacters: reconcileTotal("totalCharacters", "charactersTyped"),
+    totalCorrectCharacters: reconcileTotal("totalCorrectCharacters", "correctCharacters"),
+    bestWpm: Math.max(number(baseProgress.bestWpm), number(localProgress.bestWpm), ...distinctAttempts.map((attempt) => number(attempt.netWpm))),
+    averageWpm: reconcileAverage("averageWpm", "netWpm"),
+    averageAccuracy: reconcileAverage("averageAccuracy", "accuracy"),
+    averageConsistency: reconcileAverage("averageConsistency", "consistency"),
+    currentStreak: Math.max(number(baseProgress.currentStreak), number(localProgress.currentStreak)),
+    longestStreak: Math.max(number(baseProgress.longestStreak), number(localProgress.longestStreak)),
+    lastPracticeDate: latestIso(baseProgress.lastPracticeDate, localProgress.lastPracticeDate),
+  };
+}
+
 export function hasMeaningfulLocalProgress(data) {
   return Boolean(
     data?.onboarding?.completed
@@ -640,7 +683,7 @@ function cloudStatistics(dailyRows = [], skillRows = []) {
   return { dailyActivity, keyStats, bigramStats, wordStats };
 }
 
-export function mergeCloudIntoLocal(localData, cloud) {
+export function mergeCloudIntoLocal(localData, cloud, options = {}) {
   if (!cloud?.progress) return validateImportedData(localData);
   const profile = cloud.profile;
   const settings = cloud.settings;
@@ -667,6 +710,29 @@ export function mergeCloudIntoLocal(localData, cloud) {
   const localCount = number(localData.progress?.totalSessions);
   const cloudCount = number(progress.total_sessions);
   const cloudIsNewer = cloudCount >= localCount;
+  const cloudSessionIds = new Set(array(cloud.sessions).map((row) => String(row.client_session_id)));
+  const additiveSessionIds = array(options.pendingSessionIds)
+    .map(String)
+    .filter((id) => !cloudSessionIds.has(id));
+  const cloudProgress = {
+    totalPracticeSeconds: number(progress.total_practice_seconds),
+    totalSessions: cloudCount,
+    totalCharacters: number(progress.total_characters),
+    totalCorrectCharacters: number(progress.total_correct_characters),
+    bestWpm: number(progress.best_wpm),
+    averageWpm: number(progress.average_wpm),
+    averageAccuracy: number(progress.average_accuracy),
+    averageConsistency: number(progress.average_consistency),
+    currentStreak: number(progress.current_streak),
+    longestStreak: number(progress.longest_streak),
+    lastPracticeDate: progress.last_practice_date,
+  };
+  const reconciledProgress = reconcileDistinctAttemptProgress(
+    cloudProgress,
+    localData.progress,
+    localData.attempts,
+    additiveSessionIds,
+  );
 
   return validateImportedData({
     ...localData,
@@ -696,17 +762,17 @@ export function mergeCloudIntoLocal(localData, cloud) {
       activeLessonId: cloudIsNewer ? progress.active_lesson_id : localData.progress?.activeLessonId,
       completedLessons: [...new Set([...array(localData.progress?.completedLessons), ...array(progress.completed_lessons)])],
       lessonMastery: mastery,
-      totalPracticeSeconds: Math.max(number(localData.progress?.totalPracticeSeconds), number(progress.total_practice_seconds)),
-      totalSessions: Math.max(localCount, cloudCount),
-      totalCharacters: Math.max(number(localData.progress?.totalCharacters), number(progress.total_characters)),
-      totalCorrectCharacters: Math.max(number(localData.progress?.totalCorrectCharacters), number(progress.total_correct_characters)),
-      bestWpm: Math.max(number(localData.progress?.bestWpm), number(progress.best_wpm)),
-      averageWpm: cloudIsNewer ? number(progress.average_wpm) : number(localData.progress?.averageWpm),
-      averageAccuracy: cloudIsNewer ? number(progress.average_accuracy) : number(localData.progress?.averageAccuracy),
-      averageConsistency: cloudIsNewer ? number(progress.average_consistency) : number(localData.progress?.averageConsistency),
-      currentStreak: Math.max(number(localData.progress?.currentStreak), number(progress.current_streak)),
-      longestStreak: Math.max(number(localData.progress?.longestStreak), number(progress.longest_streak)),
-      lastPracticeDate: latestIso(localData.progress?.lastPracticeDate, progress.last_practice_date),
+      totalPracticeSeconds: additiveSessionIds.length ? reconciledProgress.totalPracticeSeconds : Math.max(number(localData.progress?.totalPracticeSeconds), number(progress.total_practice_seconds)),
+      totalSessions: additiveSessionIds.length ? reconciledProgress.totalSessions : Math.max(localCount, cloudCount),
+      totalCharacters: additiveSessionIds.length ? reconciledProgress.totalCharacters : Math.max(number(localData.progress?.totalCharacters), number(progress.total_characters)),
+      totalCorrectCharacters: additiveSessionIds.length ? reconciledProgress.totalCorrectCharacters : Math.max(number(localData.progress?.totalCorrectCharacters), number(progress.total_correct_characters)),
+      bestWpm: additiveSessionIds.length ? reconciledProgress.bestWpm : Math.max(number(localData.progress?.bestWpm), number(progress.best_wpm)),
+      averageWpm: additiveSessionIds.length ? reconciledProgress.averageWpm : cloudIsNewer ? number(progress.average_wpm) : number(localData.progress?.averageWpm),
+      averageAccuracy: additiveSessionIds.length ? reconciledProgress.averageAccuracy : cloudIsNewer ? number(progress.average_accuracy) : number(localData.progress?.averageAccuracy),
+      averageConsistency: additiveSessionIds.length ? reconciledProgress.averageConsistency : cloudIsNewer ? number(progress.average_consistency) : number(localData.progress?.averageConsistency),
+      currentStreak: additiveSessionIds.length ? reconciledProgress.currentStreak : Math.max(number(localData.progress?.currentStreak), number(progress.current_streak)),
+      longestStreak: additiveSessionIds.length ? reconciledProgress.longestStreak : Math.max(number(localData.progress?.longestStreak), number(progress.longest_streak)),
+      lastPracticeDate: additiveSessionIds.length ? reconciledProgress.lastPracticeDate : latestIso(localData.progress?.lastPracticeDate, progress.last_practice_date),
     },
     personalBests: { ...object(progress.personal_bests), ...object(localData.personalBests) },
     lastPracticeConfig: cloudIsNewer ? object(progress.last_practice_config) : localData.lastPracticeConfig,
@@ -733,6 +799,13 @@ export function mergeAccountLocalData(baseData, latestData, options = {}) {
   const preferLatest = latestCount >= baseCount;
   const preferLatestSnapshot = Boolean(options.preferLatestSnapshot);
   const preferLatestPersonalState = preferLatestSnapshot || preferLatest;
+  const reconciledProgress = reconcileDistinctAttemptProgress(
+    baseData.progress,
+    latestData.progress,
+    latestData.attempts,
+    options.additiveSessionIds,
+  );
+  const hasAdditiveSessions = array(options.additiveSessionIds).length > 0;
   return validateImportedData({
     ...baseData,
     profile: preferLatestPersonalState ? latestData.profile : baseData.profile,
@@ -744,17 +817,17 @@ export function mergeAccountLocalData(baseData, latestData, options = {}) {
       activeLessonId: preferLatest ? latestData.progress?.activeLessonId : baseData.progress?.activeLessonId,
       completedLessons: [...new Set([...array(baseData.progress?.completedLessons), ...array(latestData.progress?.completedLessons)])],
       lessonMastery: mergeMasteryMaps(baseData.progress?.lessonMastery, latestData.progress?.lessonMastery),
-      totalPracticeSeconds: Math.max(number(baseData.progress?.totalPracticeSeconds), number(latestData.progress?.totalPracticeSeconds)),
-      totalSessions: Math.max(baseCount, latestCount),
-      totalCharacters: Math.max(number(baseData.progress?.totalCharacters), number(latestData.progress?.totalCharacters)),
-      totalCorrectCharacters: Math.max(number(baseData.progress?.totalCorrectCharacters), number(latestData.progress?.totalCorrectCharacters)),
-      bestWpm: Math.max(number(baseData.progress?.bestWpm), number(latestData.progress?.bestWpm)),
-      averageWpm: preferLatest ? number(latestData.progress?.averageWpm) : number(baseData.progress?.averageWpm),
-      averageAccuracy: preferLatest ? number(latestData.progress?.averageAccuracy) : number(baseData.progress?.averageAccuracy),
-      averageConsistency: preferLatest ? number(latestData.progress?.averageConsistency) : number(baseData.progress?.averageConsistency),
-      currentStreak: Math.max(number(baseData.progress?.currentStreak), number(latestData.progress?.currentStreak)),
-      longestStreak: Math.max(number(baseData.progress?.longestStreak), number(latestData.progress?.longestStreak)),
-      lastPracticeDate: latestIso(baseData.progress?.lastPracticeDate, latestData.progress?.lastPracticeDate),
+      totalPracticeSeconds: hasAdditiveSessions ? reconciledProgress.totalPracticeSeconds : Math.max(number(baseData.progress?.totalPracticeSeconds), number(latestData.progress?.totalPracticeSeconds)),
+      totalSessions: hasAdditiveSessions ? reconciledProgress.totalSessions : Math.max(baseCount, latestCount),
+      totalCharacters: hasAdditiveSessions ? reconciledProgress.totalCharacters : Math.max(number(baseData.progress?.totalCharacters), number(latestData.progress?.totalCharacters)),
+      totalCorrectCharacters: hasAdditiveSessions ? reconciledProgress.totalCorrectCharacters : Math.max(number(baseData.progress?.totalCorrectCharacters), number(latestData.progress?.totalCorrectCharacters)),
+      bestWpm: hasAdditiveSessions ? reconciledProgress.bestWpm : Math.max(number(baseData.progress?.bestWpm), number(latestData.progress?.bestWpm)),
+      averageWpm: hasAdditiveSessions ? reconciledProgress.averageWpm : preferLatest ? number(latestData.progress?.averageWpm) : number(baseData.progress?.averageWpm),
+      averageAccuracy: hasAdditiveSessions ? reconciledProgress.averageAccuracy : preferLatest ? number(latestData.progress?.averageAccuracy) : number(baseData.progress?.averageAccuracy),
+      averageConsistency: hasAdditiveSessions ? reconciledProgress.averageConsistency : preferLatest ? number(latestData.progress?.averageConsistency) : number(baseData.progress?.averageConsistency),
+      currentStreak: hasAdditiveSessions ? reconciledProgress.currentStreak : Math.max(number(baseData.progress?.currentStreak), number(latestData.progress?.currentStreak)),
+      longestStreak: hasAdditiveSessions ? reconciledProgress.longestStreak : Math.max(number(baseData.progress?.longestStreak), number(latestData.progress?.longestStreak)),
+      lastPracticeDate: hasAdditiveSessions ? reconciledProgress.lastPracticeDate : latestIso(baseData.progress?.lastPracticeDate, latestData.progress?.lastPracticeDate),
     },
     personalBests: { ...object(baseData.personalBests), ...object(latestData.personalBests) },
     lastPracticeConfig: preferLatestPersonalState ? latestData.lastPracticeConfig : baseData.lastPracticeConfig,
@@ -839,7 +912,7 @@ export function mergeGuestIntoAccount(accountData, guestData) {
   });
 }
 
-export async function pullCloudData(userId, localData) {
+export async function pullCloudData(userId, localData, options = {}) {
   const supabase = await getSupabaseClient();
   if (!supabase || !userId) return null;
 
@@ -866,5 +939,5 @@ export async function pullCloudData(userId, localData) {
     sessions: sessionsResult.data,
     dailyActivity: dailyResult.data,
     skills: skillsResult.data,
-  });
+  }, options);
 }

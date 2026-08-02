@@ -255,6 +255,90 @@ test("practice completed during the initial cloud pull is preserved", () => {
   );
 });
 
+test("equal-count sessions from two devices are counted as distinct progress", () => {
+  const cloudBase = createFreshAppData();
+  cloudBase.progress.totalSessions = 1;
+  cloudBase.progress.totalPracticeSeconds = 60;
+  cloudBase.progress.totalCharacters = 150;
+  cloudBase.progress.totalCorrectCharacters = 145;
+  cloudBase.progress.averageWpm = 30;
+  cloudBase.progress.averageAccuracy = 96;
+  cloudBase.attempts = [attempt("cloud-session")];
+
+  const offlineDevice = createFreshAppData();
+  offlineDevice.progress.totalSessions = 1;
+  offlineDevice.progress.totalPracticeSeconds = 60;
+  offlineDevice.progress.totalCharacters = 150;
+  offlineDevice.progress.totalCorrectCharacters = 145;
+  offlineDevice.progress.averageWpm = 30;
+  offlineDevice.progress.averageAccuracy = 96;
+  offlineDevice.attempts = [attempt("offline-session", "2026-08-01T12:00:00.000Z")];
+
+  const merged = mergeAccountLocalData(cloudBase, offlineDevice, {
+    preferLatestSnapshot: true,
+    additiveSessionIds: ["offline-session"],
+  });
+
+  assert.equal(merged.progress.totalSessions, 2);
+  assert.equal(merged.progress.totalPracticeSeconds, 120);
+  assert.equal(merged.progress.totalCharacters, 300);
+  assert.equal(merged.progress.totalCorrectCharacters, 290);
+  assert.deepEqual(new Set(merged.attempts.map((item) => item.id)), new Set(["cloud-session", "offline-session"]));
+});
+
+test("a pending session already present in the cloud is not counted twice", () => {
+  const local = createFreshAppData();
+  local.progress.totalSessions = 1;
+  local.progress.totalPracticeSeconds = 60;
+  local.progress.totalCharacters = 150;
+  local.progress.totalCorrectCharacters = 145;
+  local.progress.averageWpm = 30;
+  local.progress.averageAccuracy = 96;
+  local.attempts = [attempt("already-synced")];
+
+  const merged = mergeCloudIntoLocal(local, {
+    profile: null,
+    settings: null,
+    progress: {
+      data_version: 9,
+      completed_lessons: [],
+      total_practice_seconds: 60,
+      total_sessions: 1,
+      total_characters: 150,
+      total_correct_characters: 145,
+      best_wpm: 30,
+      average_wpm: 30,
+      average_accuracy: 96,
+      average_consistency: 0,
+      current_streak: 1,
+      longest_streak: 1,
+      onboarding: {},
+      adaptive: {},
+      personal_bests: {},
+      last_practice_config: {},
+      saved_custom_texts: [],
+      practice_content_history: [],
+    },
+    mastery: [],
+    sessions: [{
+      client_session_id: "already-synced",
+      completed_at: "2026-08-01T10:00:00.000Z",
+      mode: "practice",
+      duration_seconds: 60,
+      net_wpm: 30,
+      keystroke_accuracy: 96,
+      typed_characters: 150,
+      correct_characters: 145,
+      metadata: {},
+    }],
+    dailyActivity: [],
+    skills: [],
+  }, { pendingSessionIds: ["already-synced"] });
+
+  assert.equal(merged.progress.totalSessions, 1);
+  assert.equal(merged.progress.totalPracticeSeconds, 60);
+});
+
 test("pending local preferences win without discarding newer cloud session totals", () => {
   const cloudBase = createFreshAppData();
   cloudBase.progress.totalSessions = 12;

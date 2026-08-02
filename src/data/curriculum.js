@@ -539,6 +539,7 @@ export const lessons = [
     title: "Emails and forms",
     subtitle: "Practise common digital tasks",
     focusKeys: ["@", ".", ":", "-"],
+    coveragePracticeMultipliers: { "@": 1.25, "-": 1.25 },
     allowedCharacters: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789;,./?' :@-_",
     technique: "Slow down for names, addresses, dates, and identifiers. A practical typist checks exact characters instead of relying on context.",
     fingerCue: "Precision entry",
