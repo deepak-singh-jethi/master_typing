@@ -86,7 +86,7 @@ export function SessionResults({
             </span>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{diagnosis.eyebrow}</p>
-              <h2 ref={headingRef} tabIndex={-1} id="result-heading" className="mt-1 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl dark:text-white">{diagnosis.title}</h2>
+              <h2 ref={headingRef} tabIndex={-1} id="result-heading" className="mt-1 text-xl font-semibold tracking-tight text-slate-950 outline-none sm:text-2xl dark:text-white">{diagnosis.title}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">{diagnosis.summary}</p>
               <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-slate-700 dark:text-slate-200">Next: {diagnosis.action}</p>
             </div>

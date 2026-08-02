@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Check,
   Clock3,
-  Lightbulb,
   LockKeyhole,
   RefreshCcw,
   Repeat2,
@@ -297,22 +296,29 @@ function LessonPageContent({ lessonId }) {
     setSeed(Date.now());
   };
 
-  const sessionControls = (
-    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Mode</span>
-        <SegmentedControl
-          value={practiceMode}
-          onChange={(value) => { setPracticeMode(value); resetGeneratedText(); }}
-          options={practiceModes}
-          label="Lesson practice mode"
-          className="rounded-xl p-0.5 [&>button]:min-h-8 [&>button]:rounded-[0.6rem] [&>button]:px-2.5 [&>button]:py-1.5"
-        />
-      </div>
+  const modeControl = (
+    <div className="min-w-0">
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Mode</p>
+      <SegmentedControl
+        value={practiceMode}
+        onChange={(value) => { setPracticeMode(value); resetGeneratedText(); }}
+        options={practiceModes}
+        label="Lesson practice mode"
+        className="w-full rounded-xl p-0.5 [&>button]:min-h-10 [&>button]:flex-1 [&>button]:rounded-[0.65rem] [&>button]:px-3 [&>button]:py-1.5"
+      />
+    </div>
+  );
 
-      {practiceMode === "guided" ? (
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 xl:justify-end" role="group" aria-label="Guided exercise">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Exercise</span>
+  const sessionControls = practiceMode === "guided" ? (
+    <div className="grid gap-3 lg:grid-cols-[17rem_minmax(0,1fr)_auto] lg:items-end">
+      {modeControl}
+
+      <div className="min-w-0">
+        <div className="mb-1.5 flex items-center justify-between gap-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Exercise</p>
+          <p className="text-[10px] font-medium text-slate-400">{exerciseIndex + 1} of {lesson.exercises.length}</p>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-3" role="group" aria-label="Guided exercise">
           {lesson.exercises.map((item, index) => {
             const done = passedExercises.includes(index) || index < exerciseIndex;
             const active = index === exerciseIndex;
@@ -329,45 +335,67 @@ function LessonPageContent({ lessonId }) {
                   resetGeneratedText();
                 }}
                 className={cn(
-                  "inline-flex min-h-8 items-center gap-1.5 rounded-xl border px-2.5 text-[11px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45",
-                  active && "border-indigo-500 bg-indigo-600 text-white",
+                  "group inline-flex h-10 min-w-[9.25rem] items-center gap-2 rounded-xl border px-3 text-left text-[11px] font-semibold transition sm:min-w-0 disabled:cursor-not-allowed disabled:opacity-45",
+                  active && "border-indigo-500 bg-indigo-600 text-white shadow-sm shadow-indigo-600/20",
                   done && !active && "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-300",
-                  !done && !active && "border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+                  !done && !active && "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800",
                 )}
               >
-                {done ? <Check className="size-3.5" aria-hidden="true" /> : <span>{index + 1}</span>}
-                <span>{item.title}</span>
+                <span className={cn(
+                  "grid size-5 shrink-0 place-items-center rounded-md text-[10px] font-bold",
+                  active && "bg-white/15 text-white",
+                  done && !active && "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+                  !done && !active && "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300",
+                )}>
+                  {done ? <Check className="size-3.5" aria-hidden="true" /> : index + 1}
+                </span>
+                <span className="min-w-0 truncate">{item.title}</span>
               </button>
             );
           })}
-          <Button variant="ghost" size="sm" onClick={generateFreshGuidedText} aria-label="Generate fresh guided text">
-            <RefreshCcw className="size-3.5" aria-hidden="true" />Fresh text
-          </Button>
         </div>
-      ) : (
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 xl:justify-end">
-          {practiceMode === "longer" ? (
-            <ControlGroup icon={Repeat2} label="Length">
-              {[100, 200, 300, 500].map((value) => (
-                <ChoiceButton key={value} active={wordCount === value} onClick={() => { setWordCount(value); resetGeneratedText(); }}>{value}</ChoiceButton>
-              ))}
-              <span className="text-[10px] text-slate-400">words</span>
-            </ControlGroup>
-          ) : (
-            <ControlGroup icon={Timer} label="Timer">
-              {[60, 180, 300, 600].map((value) => (
-                <ChoiceButton key={value} active={durationSeconds === value} onClick={() => { setDurationSeconds(value); resetGeneratedText(); }}>{value / 60} min</ChoiceButton>
-              ))}
-            </ControlGroup>
-          )}
-          <Button variant="ghost" size="sm" onClick={resetGeneratedText}><RefreshCcw className="size-3.5" aria-hidden="true" />New text</Button>
-        </div>
-      )}
+      </div>
+
+      <Button
+        variant="secondary"
+        size="sm"
+        className="h-10 w-full px-3 lg:w-auto"
+        onClick={generateFreshGuidedText}
+        aria-label="Generate fresh guided text"
+      >
+        <RefreshCcw className="size-3.5" aria-hidden="true" />Fresh text
+      </Button>
+    </div>
+  ) : (
+    <div className="grid gap-3 lg:grid-cols-[17rem_minmax(0,1fr)_auto] lg:items-end">
+      {modeControl}
+      <div className="min-w-0">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+          {practiceMode === "longer" ? "Text length" : "Session timer"}
+        </p>
+        {practiceMode === "longer" ? (
+          <ControlGroup icon={Repeat2} label="Length">
+            {[100, 200, 300, 500].map((value) => (
+              <ChoiceButton key={value} active={wordCount === value} onClick={() => { setWordCount(value); resetGeneratedText(); }}>{value}</ChoiceButton>
+            ))}
+            <span className="text-[10px] text-slate-400">words</span>
+          </ControlGroup>
+        ) : (
+          <ControlGroup icon={Timer} label="Timer">
+            {[60, 180, 300, 600].map((value) => (
+              <ChoiceButton key={value} active={durationSeconds === value} onClick={() => { setDurationSeconds(value); resetGeneratedText(); }}>{value / 60} min</ChoiceButton>
+            ))}
+          </ControlGroup>
+        )}
+      </div>
+      <Button variant="secondary" size="sm" className="h-10 w-full px-3 lg:w-auto" onClick={resetGeneratedText}>
+        <RefreshCcw className="size-3.5" aria-hidden="true" />New text
+      </Button>
     </div>
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto max-w-6xl space-y-5">
       <Card className="p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -384,15 +412,6 @@ function LessonPageContent({ lessonId }) {
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2.5 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
-          <Lightbulb className="size-4 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden="true" />
-          <span><strong>Finger cue:</strong> {lesson.fingerCue}. Look at the text and keep the shoulders relaxed.</span>
-          {lesson.focusKeys.length > 0 && (
-            <span className="ml-auto flex flex-wrap gap-1.5">
-              {lesson.focusKeys.map((key) => <kbd key={key} className="rounded-lg border border-amber-200/80 bg-white/70 px-2 py-1 font-mono font-semibold text-amber-800 dark:border-amber-500/20 dark:bg-slate-950/30 dark:text-amber-200">{key}</kbd>)}
-            </span>
-          )}
-        </div>
       </Card>
 
       <TypingWorkspace

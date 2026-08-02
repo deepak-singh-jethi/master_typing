@@ -257,27 +257,46 @@ export function TypingWorkspace({
               {sessionControls}
             </div>
           )}
-          <div className="border-b border-slate-200 px-5 py-4 sm:px-6 dark:border-slate-800">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.17em] text-indigo-600 dark:text-indigo-400">{sessionLabel}</p>
-                <h1 id="session-title" className="mt-2 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl dark:text-white">{title}</h1>
-                {description && <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</p>}
+          <div className="border-b border-slate-200 px-5 py-5 sm:px-6 dark:border-slate-800">
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
+              <div className="min-w-0 pt-0.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">{sessionLabel}</p>
+                <h1 id="session-title" className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950 dark:text-white">{title}</h1>
+                {description && (
+                  <p className="mt-2 max-w-[42rem] text-sm leading-6 text-slate-500 lg:min-h-12 dark:text-slate-400">
+                    {description}
+                  </p>
+                )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {showLiveWpm && <LiveValue label="WPM" value={Math.round(session.metrics.netWpm)} />}
-                {showLiveAccuracy && <LiveValue label="Accuracy" value={`${Math.round(session.metrics.keystrokeAccuracy)}%`} />}
-                <LiveValue label={durationSeconds ? "Left" : "Time"} value={formatClock(displayTime)} />
-                {(session.status === "running" || session.status === "paused") && (
-                  <Button variant="secondary" size="sm" onClick={session.togglePause}>
+              <div className="w-full lg:w-80">
+                <div className={cn(
+                  "grid gap-2",
+                  showLiveWpm && showLiveAccuracy
+                    ? "grid-cols-3"
+                    : showLiveWpm || showLiveAccuracy
+                      ? "grid-cols-2"
+                      : "grid-cols-1",
+                )}>
+                  {showLiveWpm && <LiveValue label="WPM" value={Math.round(session.metrics.netWpm)} />}
+                  {showLiveAccuracy && <LiveValue label="Accuracy" value={`${Math.round(session.metrics.keystrokeAccuracy)}%`} />}
+                  <LiveValue label={durationSeconds ? "Left" : "Time"} value={formatClock(displayTime)} />
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-10 w-full"
+                    disabled={session.status !== "running" && session.status !== "paused"}
+                    onClick={session.togglePause}
+                  >
                     {session.status === "paused" ? <Play className="size-4" /> : <Pause className="size-4" />}
                     {session.status === "paused" ? "Resume" : "Pause"}
                   </Button>
-                )}
-                <Button variant="secondary" size="sm" onClick={restart}>
-                  <RefreshCcw className="size-4" />Restart
-                </Button>
+                  <Button variant="secondary" size="sm" className="h-10 w-full" onClick={restart}>
+                    <RefreshCcw className="size-4" />Restart
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -456,9 +475,9 @@ export function TypingWorkspace({
 
 function LiveValue({ label, value }) {
   return (
-    <div className="rounded-xl bg-slate-100 px-3 py-2 text-right dark:bg-slate-800">
-      <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="text-sm font-semibold text-slate-950 dark:text-white">{value}</p>
+    <div className="grid min-h-[4.25rem] min-w-0 place-content-center rounded-2xl border border-slate-200/80 bg-slate-50 px-2.5 py-2 text-center dark:border-slate-700/80 dark:bg-slate-800/80">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</p>
+      <p className="mt-0.5 whitespace-nowrap text-base font-semibold tabular-nums text-slate-950 dark:text-white">{value}</p>
     </div>
   );
 }
