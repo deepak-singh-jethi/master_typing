@@ -1,8 +1,38 @@
 -- Run against a disposable/staging database after migrations.
--- It verifies the structural ownership contract and uses two JWT identities
--- without creating or modifying learner rows.
+-- It seeds two temporary learner scopes, verifies account isolation across every
+-- user-data table, and rolls the entire test back.
 
 begin;
+
+-- The fixture UUIDs intentionally do not create Auth accounts. Disabling FK
+-- triggers locally keeps this test isolated from Supabase Auth internals; the
+-- transaction rollback guarantees that no learner rows survive.
+set local session_replication_role = replica;
+
+insert into public.profiles (user_id, display_name) values
+  ('00000000-0000-4000-8000-000000000001', 'RLS owner A'),
+  ('00000000-0000-4000-8000-000000000002', 'RLS owner B');
+insert into public.user_settings (user_id) values
+  ('00000000-0000-4000-8000-000000000001'),
+  ('00000000-0000-4000-8000-000000000002');
+insert into public.user_progress (user_id) values
+  ('00000000-0000-4000-8000-000000000001'),
+  ('00000000-0000-4000-8000-000000000002');
+insert into public.lesson_mastery (user_id, lesson_id) values
+  ('00000000-0000-4000-8000-000000000001', 'rls-test'),
+  ('00000000-0000-4000-8000-000000000002', 'rls-test');
+insert into public.session_summaries (user_id, client_session_id, mode, completed_at) values
+  ('00000000-0000-4000-8000-000000000001', 'rls-test-a', 'test', now()),
+  ('00000000-0000-4000-8000-000000000002', 'rls-test-b', 'test', now());
+insert into public.daily_activity (user_id, activity_date) values
+  ('00000000-0000-4000-8000-000000000001', date '2000-01-01'),
+  ('00000000-0000-4000-8000-000000000002', date '2000-01-01');
+insert into public.skill_aggregates (user_id, skill_type, skill_key) values
+  ('00000000-0000-4000-8000-000000000001', 'key', 'a'),
+  ('00000000-0000-4000-8000-000000000002', 'key', 'a');
+insert into public.sync_state (user_id, device_id) values
+  ('00000000-0000-4000-8000-000000000001', 'rls-test-device'),
+  ('00000000-0000-4000-8000-000000000002', 'rls-test-device');
 
 do $$
 declare
@@ -26,14 +56,32 @@ begin
 end;
 $$;
 
-select set_config('request.jwt.claim.sub', gen_random_uuid()::text, true);
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000001', true);
 set local role authenticated;
-select 1 / case when count(*) = 0 then 1 else 0 end as second_account_isolated from public.profiles;
+select 1 / case when
+  (select count(*) from public.profiles) = 1 and
+  (select count(*) from public.user_settings) = 1 and
+  (select count(*) from public.user_progress) = 1 and
+  (select count(*) from public.lesson_mastery) = 1 and
+  (select count(*) from public.session_summaries) = 1 and
+  (select count(*) from public.daily_activity) = 1 and
+  (select count(*) from public.skill_aggregates) = 1 and
+  (select count(*) from public.sync_state) = 1
+then 1 else 0 end as owner_a_isolated;
 reset role;
 
-select set_config('request.jwt.claim.sub', coalesce((select user_id::text from public.profiles limit 1), gen_random_uuid()::text), true);
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', true);
 set local role authenticated;
-select 1 / case when count(*) <= 1 then 1 else 0 end as owner_scope_is_bounded from public.profiles;
+select 1 / case when
+  (select count(*) from public.profiles) = 1 and
+  (select count(*) from public.user_settings) = 1 and
+  (select count(*) from public.user_progress) = 1 and
+  (select count(*) from public.lesson_mastery) = 1 and
+  (select count(*) from public.session_summaries) = 1 and
+  (select count(*) from public.daily_activity) = 1 and
+  (select count(*) from public.skill_aggregates) = 1 and
+  (select count(*) from public.sync_state) = 1
+then 1 else 0 end as owner_b_isolated;
 reset role;
 
 select 1 / case when not has_table_privilege('anon','public.profiles','select') then 1 else 0 end as anonymous_isolated;

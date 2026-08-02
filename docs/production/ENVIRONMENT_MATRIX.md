@@ -3,7 +3,7 @@
 | Concern | Local | Staging | Production |
 |---|---|---|---|
 | Client build | developer machine | immutable CI artifact | promoted immutable CI artifact |
-| Supabase | optional developer project | separate project required | `TYPING` (`wccgwbbxbrgxixhvyghq`) |
+| Supabase | optional developer project | `TYPING-STAGING` (`ttqbbpwvenltvtzjzkzh`) | `TYPING` (`wccgwbbxbrgxixhvyghq`) |
 | Project URL | `.env.local` | protected host variable | protected host variable |
 | Publishable key | `.env.local` | protected host variable | protected host variable |
 | Service-role key | never available to Vite | Edge Function secret only | Edge Function secret only |
@@ -18,4 +18,4 @@ Rules:
 - Redirect allowlists contain exact deployed URLs; wildcards are prohibited.
 - Key rotation requires updating the protected environment value, rebuilding, testing staging, then promoting the same source.
 
-The staging Supabase project is intentionally recorded as **not yet provisioned**. Creating a project or branch has a recurring cost and requires a separate explicit cost confirmation before it can be automated.
+The staging project was provisioned on 2026-08-02 in `ap-southeast-1` after an explicit $0/month cost acknowledgement. Its publishable key belongs in the protected staging host variable and is intentionally not committed.

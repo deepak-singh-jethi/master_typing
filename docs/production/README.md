@@ -1,6 +1,6 @@
 # Typing Master production-readiness plan
 
-Status: **Phases 6–7 implemented; external staging evidence pending; product not yet approved for production**  
+Status: **Phase 7 backend staging evidence passed; hosting and repository controls pending; product not yet approved for production**
 Audited version: `0.5.1`  
 Audit date: 2026-08-01  
 Product boundary: desktop web application using a physical keyboard
@@ -20,7 +20,7 @@ Current strengths:
 
 Current release blockers include:
 
-- A separate staging Supabase project and hosted staging URL have not been provisioned, so clean rebuild, successful test-account deletion, header verification, backup restore, and rollback drills remain unproven.
+- The isolated staging backend is proven, but a hosted staging URL is still needed for response-header, redirect, client rollback, and backup/restore drills.
 - A Git remote and protected-main rules are not configured yet.
 - Supabase leaked-password protection still needs enabling in the Auth dashboard.
 - Runtime monitoring, strict desktop/browser QA, non-functional measurements, privacy/support material, and controlled-launch evidence belong to Phases 8–11.
