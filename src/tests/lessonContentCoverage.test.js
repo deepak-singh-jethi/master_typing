@@ -135,6 +135,28 @@ test("multi-character checkpoint patterns and email symbols cannot disappear fro
   assert.ok(atSign.actual >= atSign.minimum, `@ coverage is ${atSign.actual}/${atSign.minimum}`);
 });
 
+test("email practice gives at-sign and hyphen more than floor-level exposure", () => {
+  const lesson = lessons.find((item) => item.id === "emails-forms");
+  for (const mode of LESSON_MODE_CONFIGS) {
+    for (const seed of REPRESENTATIVE_SEEDS) {
+      const generated = generatePracticeSession({
+        contentType: "lesson",
+        lessonId: lesson.id,
+        seed,
+        ...mode,
+      });
+      const quality = generated.metadata.lessonCoverage;
+      for (const target of ["@", "-"]) {
+        const coverage = quality.coverage.find((item) => item.target === target);
+        assert.ok(
+          coverage.actual >= Math.ceil(coverage.minimum * 1.25),
+          `${mode.label}/seed:${seed} used ${target} ${coverage.actual}/${coverage.minimum} times`,
+        );
+      }
+    }
+  }
+});
+
 test("coverage requirements scale by lesson length without dropping any declared target", () => {
   for (const lesson of lessons) {
     const short = getLessonCoverageRequirements({ lesson, targetWords: 100 });
