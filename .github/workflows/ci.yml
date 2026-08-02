@@ -1,0 +1,31 @@
+name: release-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_BUILD_ID: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run release:check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: typing-master-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 30
