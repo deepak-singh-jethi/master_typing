@@ -6,8 +6,12 @@ import { getPasswordResetRedirect, hasPasswordRecoveryParams } from "@/lib/authU
 function friendlyAuthError(error) {
   const message = error?.message || "Authentication failed.";
   if (/invalid login credentials/i.test(message)) return "Incorrect email or password.";
+  if (/email not confirmed/i.test(message)) return "Confirm your email before signing in.";
   if (/user already registered/i.test(message)) return "An account already exists for this email.";
-  if (/password should be at least/i.test(message)) return "Use a password with at least 8 characters.";
+  if (/password should be at least|weak password/i.test(message)) return "Use a password with at least 8 characters.";
+  if (/same password|different from the old password/i.test(message)) return "Choose a password you have not used for this account.";
+  if (/email address not authorized/i.test(message)) return "This staging email service cannot send to that address. Use an approved tester email or configure custom SMTP.";
+  if (/rate limit|too many requests|over_email_send_rate_limit/i.test(message)) return "Too many account emails were requested. Wait a few minutes and try again.";
   if (/failed to fetch|network/i.test(message)) return "Unable to reach the account service. Check your connection and try again.";
   return message;
 }
@@ -91,10 +95,14 @@ export function AuthProvider({ children }) {
   const signUp = useCallback(async ({ email, password, displayName }) => {
     try {
       const client = await requireSupabaseClient();
+      const emailRedirectTo = typeof window === "undefined" ? undefined : getPasswordResetRedirect(window.location);
       const { data, error } = await client.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { display_name: displayName?.trim() || "Learner" } },
+        options: {
+          data: { display_name: displayName?.trim() || "Learner" },
+          emailRedirectTo,
+        },
       });
       if (error) throw error;
       return data;
@@ -119,10 +127,11 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     try {
-      const client = await getSupabaseClient();
-      if (!client) return;
-      const { error } = await client.auth.signOut();
+      const client = await requireSupabaseClient();
+      const { error } = await client.auth.signOut({ scope: "local" });
       if (error) throw error;
+      setSession(null);
+      setRecoveryMode(false);
     } catch (error) {
       throw new Error(friendlyAuthError(error));
     }
