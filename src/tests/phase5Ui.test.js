@@ -136,7 +136,7 @@ test("lesson mode, length, and fresh-text controls stay attached to the typing w
   assert.match(lesson, /showSessionNav=\{false\}/);
   assert.match(lesson, />Mode</);
   assert.match(lesson, /label="Length"/);
-  assert.match(lesson, />New text</);
+  assert.match(lesson, /<Button[^>]*onClick=\{resetGeneratedText\}[^>]*>[\s\S]*?New text[\s\S]*?<\/Button>/);
   assert.match(lesson, /role="group" aria-label=\{label\}/);
   assert.match(lesson, /aria-pressed=\{active\}/);
   assert.match(workspace, /\{sessionControls\}/);
