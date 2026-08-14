@@ -3,9 +3,9 @@ import { cn } from "@/lib/utils";
 import { getActiveWordRange, getTypingWindow } from "@/lib/typingWindow";
 
 const sizeClasses = {
-  small: "text-lg leading-[1.8] sm:text-xl",
-  medium: "text-[1.35rem] leading-[1.85] sm:text-[1.75rem]",
-  large: "text-[1.55rem] leading-[1.85] sm:text-[2rem]",
+  small: "text-[1.05rem] leading-[1.85] sm:text-[1.2rem]",
+  medium: "text-[1.2rem] leading-[1.8] sm:text-[1.5rem]",
+  large: "text-[1.4rem] leading-[1.8] sm:text-[1.78rem]",
 };
 
 export function TypingText({ target, typed, textSize = "medium", caretStyle = "bar" }) {
@@ -28,7 +28,7 @@ export function TypingText({ target, typed, textSize = "medium", caretStyle = "b
       <div
         aria-hidden="true"
         className={cn(
-          "max-h-[17rem] overflow-y-auto whitespace-pre-wrap break-words font-mono tracking-[0.012em] [scrollbar-width:none] sm:max-h-[20rem] [&::-webkit-scrollbar]:hidden",
+          "max-h-[15rem] overflow-y-auto whitespace-pre-wrap break-words font-mono tracking-[0.01em] [scrollbar-width:none] sm:max-h-[17rem] lg:max-h-[18rem] [&::-webkit-scrollbar]:hidden",
           sizeClasses[textSize] ?? sizeClasses.medium,
         )}
         data-rendered-characters={windowed.text.length}

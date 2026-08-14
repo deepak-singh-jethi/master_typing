@@ -54,6 +54,15 @@ export function SessionResults({
     resultContext,
   });
   const masterySummary = summariseMasteryBlockers(masteryBlockers);
+  const guidedFlow = resultContext?.purpose === "guided"
+    && Number.isInteger(resultContext?.exerciseIndex)
+    && Number(resultContext?.totalExercises) > 0;
+  const guidedStep = guidedFlow ? Number(resultContext.exerciseIndex) + 1 : null;
+  const guidedNextAction = guidedFlow && effectivePassed
+    ? resultContext.finalExercise
+      ? "Your guided path is complete. Finish the lesson to save mastery and move forward."
+      : `Next: ${resultContext.nextExerciseTitle || "the next guided exercise"}.`
+    : diagnosis.action;
   const headingRef = useRef(null);
 
   useEffect(() => {
@@ -91,10 +100,29 @@ export function SessionResults({
                   : <TriangleAlert className="size-6" aria-hidden="true" />}
             </span>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{diagnosis.eyebrow}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                {guidedFlow ? `Lesson ${resultContext.lessonNumber} · Exercise ${guidedStep} of ${resultContext.totalExercises}` : diagnosis.eyebrow}
+              </p>
               <h2 ref={headingRef} tabIndex={-1} id="result-heading" className="mt-1 text-xl font-semibold tracking-tight text-slate-950 outline-none sm:text-2xl dark:text-white">{diagnosis.title}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">{diagnosis.summary}</p>
-              <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-slate-700 dark:text-slate-200">Next: {diagnosis.action}</p>
+              <p className="mt-2 max-w-2xl text-xs font-semibold leading-5 text-slate-700 dark:text-slate-200">{guidedNextAction}</p>
+              {guidedFlow && (
+                <div className="mt-4 flex items-center gap-1.5" aria-label={`Exercise ${guidedStep} of ${resultContext.totalExercises}`}>
+                  {Array.from({ length: resultContext.totalExercises }, (_, index) => (
+                    <span
+                      key={index}
+                      className={cn(
+                        "h-1.5 rounded-full transition-all",
+                        index < guidedStep - 1 || (effectivePassed && index === guidedStep - 1)
+                          ? "w-8 bg-emerald-500"
+                          : index === guidedStep - 1
+                            ? "w-8 bg-indigo-500"
+                            : "w-5 bg-slate-200 dark:bg-slate-700",
+                      )}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -114,7 +142,11 @@ export function SessionResults({
                 <Sparkles className="size-4" aria-hidden="true" />{newTextLabel}
               </Button>
             )}
-            <Button variant="ghost" onClick={onRetry} className="w-full sm:w-auto">
+            <Button
+              variant={!onContinue && !(hasMistakes && onPracticeMistakes) && !onNewText ? "brand" : "ghost"}
+              onClick={onRetry}
+              className="w-full sm:w-auto"
+            >
               <RefreshCcw className="size-4" aria-hidden="true" />{retryLabel}
             </Button>
           </div>
@@ -122,10 +154,21 @@ export function SessionResults({
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ResultMetric icon={Gauge} label="Net WPM" value={Math.round(result.netWpm)} sub={`Gross ${Math.round(result.grossWpm)} WPM`} />
-        <ResultMetric icon={ShieldCheck} label="Accuracy" value={`${Math.round(result.keystrokeAccuracy)}%`} sub={`${result.errors} incorrect inputs`} />
-        <ResultMetric icon={Target} label="Consistency" value={`${Math.round(result.consistency)}%`} sub={`Burst ${Math.round(result.burstWpm)} WPM`} />
-        <ResultMetric icon={CheckCircle2} label="Completion" value={`${Math.round(result.completion)}%`} sub={`${result.correctCharacters} correct characters`} />
+        {guidedFlow ? (
+          <>
+            <ResultMetric icon={ShieldCheck} label="Accuracy" value={`${Math.round(result.keystrokeAccuracy)}%`} sub={`${result.errors} incorrect inputs`} />
+            <ResultMetric icon={CheckCircle2} label="Completion" value={`${Math.round(result.completion)}%`} sub={`${result.correctCharacters} correct characters`} />
+            <ResultMetric icon={Target} label="Consistency" value={`${Math.round(result.consistency)}%`} sub="Control across the exercise" />
+            <ResultMetric icon={Gauge} label="Net WPM" value={Math.round(result.netWpm)} sub="Speed is secondary in lessons" />
+          </>
+        ) : (
+          <>
+            <ResultMetric icon={Gauge} label="Net WPM" value={Math.round(result.netWpm)} sub={`Gross ${Math.round(result.grossWpm)} WPM`} />
+            <ResultMetric icon={ShieldCheck} label="Accuracy" value={`${Math.round(result.keystrokeAccuracy)}%`} sub={`${result.errors} incorrect inputs`} />
+            <ResultMetric icon={Target} label="Consistency" value={`${Math.round(result.consistency)}%`} sub={`Burst ${Math.round(result.burstWpm)} WPM`} />
+            <ResultMetric icon={CheckCircle2} label="Completion" value={`${Math.round(result.completion)}%`} sub={`${result.correctCharacters} correct characters`} />
+          </>
+        )}
       </div>
 
       {assessmentResult && <AssessmentResultCard assessment={assessmentResult} result={result} />}
@@ -346,37 +389,41 @@ function ComparisonMetric({ label, metric }) {
 
 function MasteryBlockers({ items, summary }) {
   return (
-    <div className="rounded-3xl border border-violet-200 bg-violet-50/55 p-5 dark:border-violet-500/20 dark:bg-violet-500/5">
-      <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
-          <Target className="size-5" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-700 dark:text-violet-300">Lesson mastery</p>
-          <h3 className="mt-1 font-semibold text-slate-950 dark:text-white">
-            {summary.complete ? "Every mastery requirement is complete" : `${summary.remaining.length} requirement${summary.remaining.length === 1 ? "" : "s"} remaining`}
-          </h3>
-          {summary.next && <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Next priority: {summary.next.detail}</p>}
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {items.map((item) => (
-              <div key={item.id} className={cn(
-                "rounded-2xl border p-3",
-                item.passed
-                  ? "border-emerald-200 bg-white dark:border-emerald-500/20 dark:bg-slate-900"
-                  : "border-violet-200 bg-white dark:border-violet-500/20 dark:bg-slate-900",
-              )}>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{item.label}</p>
-                  <span className={cn("text-[10px] font-semibold uppercase tracking-[0.12em]", item.passed ? "text-emerald-600" : "text-violet-600 dark:text-violet-300")}>{item.passed ? "Done" : "Needed"}</span>
-                </div>
-                <p className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{item.current}{item.unit} <span className="text-xs font-medium text-slate-400">/ {item.target}{item.unit}</span></p>
-                <p className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">{item.detail}</p>
-              </div>
-            ))}
+    <details className="group rounded-3xl border border-violet-200 bg-violet-50/45 dark:border-violet-500/20 dark:bg-violet-500/[0.05]">
+      <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:hidden sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+            <Target className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-700 dark:text-violet-300">Lesson mastery</p>
+            <h3 className="mt-0.5 truncate font-semibold text-slate-950 dark:text-white">
+              {summary.complete ? "Every mastery requirement is complete" : `${summary.remaining.length} requirement${summary.remaining.length === 1 ? "" : "s"} still to meet`}
+            </h3>
+            {summary.next && <p className="mt-0.5 line-clamp-1 text-xs text-slate-500 dark:text-slate-400">Next priority: {summary.next.detail}</p>}
           </div>
         </div>
+        <span className="shrink-0 text-xs font-semibold text-violet-600 group-open:hidden dark:text-violet-300">View requirements</span>
+        <span className="hidden shrink-0 text-xs font-semibold text-violet-600 group-open:inline dark:text-violet-300">Hide</span>
+      </summary>
+      <div className="grid gap-2 border-t border-violet-200/70 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3 dark:border-violet-500/15">
+        {items.map((item) => (
+          <div key={item.id} className={cn(
+            "rounded-2xl border bg-white p-3 dark:bg-slate-900",
+            item.passed
+              ? "border-emerald-200 dark:border-emerald-500/20"
+              : "border-violet-200 dark:border-violet-500/20",
+          )}>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{item.label}</p>
+              <span className={cn("text-[10px] font-semibold uppercase tracking-[0.12em]", item.passed ? "text-emerald-600" : "text-violet-600 dark:text-violet-300")}>{item.passed ? "Done" : "Needed"}</span>
+            </div>
+            <p className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{item.current}{item.unit} <span className="text-xs font-medium text-slate-400">/ {item.target}{item.unit}</span></p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">{item.detail}</p>
+          </div>
+        ))}
       </div>
-    </div>
+    </details>
   );
 }
 

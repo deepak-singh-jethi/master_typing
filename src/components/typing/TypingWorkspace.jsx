@@ -251,49 +251,53 @@ export function TypingWorkspace({
       )}
 
       {!session.result && (
-        <section aria-labelledby="session-title" className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section aria-labelledby="session-title" className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_16px_45px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-900">
           {sessionControls && (
-            <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-3 sm:px-6 dark:border-slate-800 dark:bg-slate-950/25">
+            <div className="border-b border-slate-200 bg-slate-50/65 px-4 py-4 sm:px-6 dark:border-slate-800 dark:bg-slate-950/25">
               {sessionControls}
             </div>
           )}
+
           <div className="border-b border-slate-200 px-5 py-5 sm:px-6 dark:border-slate-800">
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
-              <div className="min-w-0 pt-0.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">{sessionLabel}</p>
-                <h1 id="session-title" className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950 dark:text-white">{title}</h1>
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">{sessionLabel}</p>
+                  <span className={cn(
+                    "rounded-full px-2.5 py-1 text-[10px] font-semibold",
+                    session.status === "running"
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                      : session.status === "paused"
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                        : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300",
+                  )}>
+                    {session.status === "running" ? "Typing" : session.status === "paused" ? "Paused" : "Ready"}
+                  </span>
+                </div>
+                <h1 id="session-title" className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-slate-950 dark:text-white">{title}</h1>
                 {description && (
-                  <p className="mt-2 max-w-[42rem] text-sm leading-6 text-slate-500 lg:min-h-12 dark:text-slate-400">
-                    {description}
-                  </p>
+                  <p className="mt-2 max-w-[46rem] text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
                 )}
               </div>
 
-              <div className="w-full lg:w-80">
-                <div className={cn(
-                  "grid gap-2",
-                  showLiveWpm && showLiveAccuracy
-                    ? "grid-cols-3"
-                    : showLiveWpm || showLiveAccuracy
-                      ? "grid-cols-2"
-                      : "grid-cols-1",
-                )}>
+              <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[22rem]">
+                <div className="flex flex-wrap gap-2 lg:justify-end">
                   {showLiveWpm && <LiveValue label="WPM" value={Math.round(session.metrics.netWpm)} />}
                   {showLiveAccuracy && <LiveValue label="Accuracy" value={`${Math.round(session.metrics.keystrokeAccuracy)}%`} />}
-                  <LiveValue label={durationSeconds ? "Left" : "Time"} value={formatClock(displayTime)} />
+                  <LiveValue label={durationSeconds ? "Time left" : "Time"} value={formatClock(displayTime)} />
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="flex flex-wrap gap-2 lg:justify-end">
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="h-10 w-full"
+                    className="min-w-[7.5rem]"
                     disabled={session.status !== "running" && session.status !== "paused"}
                     onClick={session.togglePause}
                   >
                     {session.status === "paused" ? <Play className="size-4" /> : <Pause className="size-4" />}
                     {session.status === "paused" ? "Resume" : "Pause"}
                   </Button>
-                  <Button variant="secondary" size="sm" className="h-10 w-full" onClick={restart}>
+                  <Button variant="ghost" size="sm" className="min-w-[7.5rem]" onClick={restart}>
                     <RefreshCcw className="size-4" />Restart
                   </Button>
                 </div>
@@ -301,136 +305,153 @@ export function TypingWorkspace({
             </div>
           </div>
 
-          <div className="p-4 sm:p-6">
-            <div
-              role="group"
-              aria-label="Typing practice area"
-              tabIndex={-1}
-              onClick={sessionReady ? focusInput : beginCountdown}
-              className={cn(
-                "relative min-h-[14rem] cursor-text rounded-3xl border p-4 outline-none transition sm:min-h-[17rem] sm:p-7",
-                session.status === "paused"
-                  ? "border-amber-300 bg-amber-50/60 dark:border-amber-500/30 dark:bg-amber-500/5"
-                  : hasFocus
-                    ? "border-indigo-400 bg-white ring-4 ring-indigo-500/10 dark:border-indigo-500 dark:bg-slate-950/50"
-                    : "border-slate-200 bg-slate-50/75 dark:border-slate-800 dark:bg-slate-950/50",
-              )}
-            >
-              <textarea
-                ref={inputRef}
-                value={inputValue}
-                onChange={handleChange}
-                onCompositionStart={() => { composingRef.current = true; }}
-                onCompositionEnd={(event) => {
-                  composingRef.current = false;
-                  commitInputValue(event.currentTarget.value, {
-                    inputType: "insertCompositionText",
-                    isCompositionCommit: true,
-                  });
-                }}
-                onFocus={() => setHasFocus(true)}
-                onBlur={() => {
-                  setHasFocus(false);
-                  if (autoPause) {
-                    window.setTimeout(() => {
-                      if (!workspaceRef.current?.contains(document.activeElement)) {
-                        session.pause("focus-loss");
-                      }
-                    }, 0);
-                  }
-                }}
-                onPaste={(event) => event.preventDefault()}
-                onDrop={(event) => event.preventDefault()}
-                onSelect={(event) => {
-                  const end = event.currentTarget.value.length;
-                  event.currentTarget.setSelectionRange(end, end);
-                }}
-                onKeyDown={(event) => {
-                  if (!sessionReady && (event.key === "Enter" || event.key === " ")) {
-                    event.preventDefault();
-                    beginCountdown();
-                    return;
-                  }
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    session.togglePause();
-                  }
-                  if (event.altKey && event.key.toLowerCase() === "r") {
-                    event.preventDefault();
-                    restart();
-                  }
-                }}
-                disabled={!sessionReady || session.status === "completed" || session.status === "paused"}
-                autoCapitalize="off"
-                autoCorrect="off"
-                autoComplete="off"
-                spellCheck={false}
-                inputMode="text"
-                aria-label={`Typing input for ${title}`}
-                className="absolute left-3 top-3 h-px w-px resize-none opacity-0"
-                aria-describedby="typing-help"
-              />
+          <div className="p-3 sm:p-5">
+            <div className="rounded-[1.55rem] border border-slate-200 bg-slate-50/70 p-2.5 sm:p-3 dark:border-slate-800 dark:bg-slate-950/35">
+              <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 px-1.5">
+                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <span className={cn(
+                    "size-2 rounded-full",
+                    session.status === "running" ? "bg-emerald-500" : hasFocus ? "bg-indigo-500" : "bg-slate-300 dark:bg-slate-600",
+                  )} />
+                  {session.status === "running" ? "Keep typing" : sessionReady ? "Ready for your first key" : "Get ready"}
+                </div>
+                <div className="hidden items-center gap-2 text-[10px] font-medium text-slate-400 sm:flex">
+                  <span>{backspaceLabel}</span><span aria-hidden="true">·</span><span>Esc pauses</span>
+                </div>
+              </div>
 
-              {!sessionReady ? (
-                <div className="grid min-h-[15rem] place-items-center text-center">
-                  <div>
-                    <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
-                      {countdownActive ? <span className="text-2xl font-bold">{countdownRemaining || "Go"}</span> : <TimerReset className="size-6" />}
-                    </span>
-                    <p className="mt-4 text-lg font-semibold text-slate-950 dark:text-white">
-                      {countdownActive ? "Get ready" : "Start when you are ready"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      {countdownActive ? "Place your fingers and focus on the first word." : `A ${countdownSeconds}-second countdown will begin before the timer.`}
-                    </p>
-                    {!countdownActive && (
-                      <Button variant="brand" className="mt-5" onClick={beginCountdown}>
-                        <Play className="size-4" />Start countdown
+              <div
+                role="group"
+                aria-label="Typing practice area"
+                tabIndex={-1}
+                onClick={sessionReady ? focusInput : beginCountdown}
+                className={cn(
+                  "relative min-h-[13rem] cursor-text rounded-[1.35rem] border bg-white p-4 outline-none transition sm:min-h-[15.5rem] sm:p-6 dark:bg-slate-950/65",
+                  session.status === "paused"
+                    ? "border-amber-300 bg-amber-50/70 dark:border-amber-500/30 dark:bg-amber-500/[0.06]"
+                    : hasFocus
+                      ? "border-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.10)] dark:border-indigo-500"
+                      : "border-slate-200 dark:border-slate-800",
+                )}
+              >
+                <textarea
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={handleChange}
+                  onCompositionStart={() => { composingRef.current = true; }}
+                  onCompositionEnd={(event) => {
+                    composingRef.current = false;
+                    commitInputValue(event.currentTarget.value, {
+                      inputType: "insertCompositionText",
+                      isCompositionCommit: true,
+                    });
+                  }}
+                  onFocus={() => setHasFocus(true)}
+                  onBlur={() => {
+                    setHasFocus(false);
+                    if (autoPause) {
+                      window.setTimeout(() => {
+                        if (!workspaceRef.current?.contains(document.activeElement)) {
+                          session.pause("focus-loss");
+                        }
+                      }, 0);
+                    }
+                  }}
+                  onPaste={(event) => event.preventDefault()}
+                  onDrop={(event) => event.preventDefault()}
+                  onSelect={(event) => {
+                    const end = event.currentTarget.value.length;
+                    event.currentTarget.setSelectionRange(end, end);
+                  }}
+                  onKeyDown={(event) => {
+                    if (!sessionReady && (event.key === "Enter" || event.key === " ")) {
+                      event.preventDefault();
+                      beginCountdown();
+                      return;
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      session.togglePause();
+                    }
+                    if (event.altKey && event.key.toLowerCase() === "r") {
+                      event.preventDefault();
+                      restart();
+                    }
+                  }}
+                  disabled={!sessionReady || session.status === "completed" || session.status === "paused"}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                  inputMode="text"
+                  aria-label={`Typing input for ${title}`}
+                  className="absolute left-3 top-3 h-px w-px resize-none opacity-0"
+                  aria-describedby="typing-help"
+                />
+
+                {!sessionReady ? (
+                  <div className="grid min-h-[13rem] place-items-center text-center sm:min-h-[15rem]">
+                    <div>
+                      <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/15">
+                        {countdownActive ? <span className="text-2xl font-bold">{countdownRemaining || "Go"}</span> : <TimerReset className="size-6" />}
+                      </span>
+                      <p className="mt-4 text-lg font-semibold text-slate-950 dark:text-white">
+                        {countdownActive ? "Get ready" : "Ready when you are"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        {countdownActive ? "Settle your hands and look at the first word." : `A ${countdownSeconds}-second countdown starts before the timer.`}
+                      </p>
+                      {!countdownActive && (
+                        <Button variant="brand" className="mt-5" onClick={beginCountdown}>
+                          <Play className="size-4" />Start countdown
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : session.status === "paused" ? (
+                  <div className="grid min-h-[13rem] place-items-center text-center sm:min-h-[15rem]">
+                    <div>
+                      <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                        <Pause className="size-5" />
+                      </span>
+                      <p className="mt-4 font-semibold text-slate-950 dark:text-white">Session paused</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Your position and timer are safe. Resume when ready.</p>
+                      <Button variant="brand" className="mt-4" onClick={() => { session.resume(); window.setTimeout(focusInput, 30); }}>
+                        <Play className="size-4" aria-hidden="true" />Resume typing
                       </Button>
-                    )}
+                    </div>
                   </div>
-                </div>
-              ) : session.status === "paused" ? (
-                <div className="grid min-h-[15rem] place-items-center text-center">
-                  <div>
-                    <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-                      <Pause className="size-5" />
-                    </span>
-                    <p className="mt-4 font-semibold text-slate-950 dark:text-white">Session paused</p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Your timer is stopped. Resume when ready.</p>
-                    <Button variant="brand" className="mt-4" onClick={() => { session.resume(); window.setTimeout(focusInput, 30); }}>
-                      <Play className="size-4" aria-hidden="true" />Resume session
-                    </Button>
+                ) : (
+                  <TypingText target={target} typed={session.typed} textSize={textSize} caretStyle={caretStyle} />
+                )}
+
+                {sessionReady && session.status === "idle" && (
+                  <div id="typing-help" className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+                    <Keyboard className="size-4" />
+                    Start typing — timing begins with your first accepted character.
                   </div>
+                )}
+
+                {sessionReady && !hasFocus && session.status === "running" && (
+                  <button
+                    type="button"
+                    onClick={focusInput}
+                    className="absolute inset-x-4 bottom-4 rounded-xl border border-indigo-200 bg-indigo-50/95 px-4 py-3 text-sm font-semibold text-indigo-700 shadow-sm backdrop-blur dark:border-indigo-500/25 dark:bg-indigo-500/10 dark:text-indigo-300"
+                  >
+                    Click here to continue typing
+                  </button>
+                )}
+              </div>
+
+              <div className="px-1.5 pb-1 pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-300">{Math.round(session.metrics.completion)}% complete</span>
+                  <span className="sm:hidden">Next: {session.expectedCharacter === " " ? "Space" : session.expectedCharacter || "—"}</span>
+                  <span className="hidden sm:inline">{session.metrics.correctionActions} corrections · {session.metrics.correctedErrors} errors fixed</span>
                 </div>
-              ) : (
-                <TypingText target={target} typed={session.typed} textSize={textSize} caretStyle={caretStyle} />
-              )}
-
-              {sessionReady && session.status === "idle" && (
-                <div id="typing-help" className="mt-5 flex items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
-                  <Keyboard className="size-4" />
-                  Start typing. The timer begins with your first accepted character.
-                </div>
-              )}
-
-              {sessionReady && !hasFocus && session.status === "running" && (
-                <button
-                  type="button"
-                  onClick={focusInput}
-                  className="absolute inset-x-5 bottom-5 rounded-2xl border border-indigo-200 bg-indigo-50/95 px-4 py-3 text-sm font-semibold text-indigo-700 shadow-sm backdrop-blur dark:border-indigo-500/25 dark:bg-indigo-500/10 dark:text-indigo-300"
-                >
-                  Click to continue typing
-                </button>
-              )}
+                <ProgressBar value={session.metrics.completion} className="mt-2" />
+              </div>
             </div>
-
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-              <span>{Math.round(session.metrics.completion)}% complete</span>
-              <span className="sm:hidden">Next: {session.expectedCharacter === " " ? "Space" : session.expectedCharacter || "—"}</span>
-              <span className="hidden sm:inline">{session.metrics.correctionActions} corrections · {session.metrics.correctedErrors} errors fixed</span>
-            </div>
-            <ProgressBar value={session.metrics.completion} className="mt-2" />
           </div>
         </section>
       )}
@@ -475,9 +496,9 @@ export function TypingWorkspace({
 
 function LiveValue({ label, value }) {
   return (
-    <div className="grid min-h-[4.25rem] min-w-0 place-content-center rounded-2xl border border-slate-200/80 bg-slate-50 px-2.5 py-2 text-center dark:border-slate-700/80 dark:bg-slate-800/80">
+    <div className="min-w-[6.2rem] rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2 text-left dark:border-slate-700/80 dark:bg-slate-800/70">
       <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-      <p className="mt-0.5 whitespace-nowrap text-base font-semibold tabular-nums text-slate-950 dark:text-white">{value}</p>
+      <p className="mt-0.5 whitespace-nowrap text-sm font-semibold tabular-nums text-slate-950 dark:text-white">{value}</p>
     </div>
   );
 }
