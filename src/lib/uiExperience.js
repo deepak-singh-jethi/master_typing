@@ -8,6 +8,7 @@ export const PAGE_META = [
   { match: (path) => path === "/", title: "Today", description: "Your next best typing action" },
   { match: (path) => path === "/learn", title: "Learn", description: "Build correct movement step by step" },
   { match: (path) => path.startsWith("/learn/"), title: "Lesson", description: "Focused guided practice" },
+  { match: (path) => path.startsWith("/review/"), title: "Spaced review", description: "Check retained movement without replaying the lesson" },
   { match: (path) => path === "/practice", title: "Practice", description: "Choose a focused session" },
   { match: (path) => path === "/tests", title: "Tests", description: "Check progress or assess your level" },
   { match: (path) => path === "/insights", title: "Insights", description: "Understand what is improving" },
@@ -46,8 +47,8 @@ export function getPrimaryDashboardAction({ onboardingCompleted, reviewQueue = [
       description: currentLessonLabel
         ? `This earlier lesson is due for a short spaced review. Your course position is still ${currentLessonLabel}.`
         : "This earlier lesson is due for a short spaced review to protect movement you already learned.",
-      label: "Start review",
-      to: `/learn/${review.lessonId}`,
+      label: "Open review",
+      to: `/review/${review.lessonId}`,
       secondaryAction: nextLesson
         ? {
             label: `Continue ${nextLesson.title}`,

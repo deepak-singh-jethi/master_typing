@@ -10,6 +10,7 @@ import { getLessonMasteryBlockers } from "../lib/resultCoaching.js";
 test("page metadata gives every primary route a concise accessible label", () => {
   assert.equal(getPageMeta("/").title, "Today");
   assert.equal(getPageMeta("/learn/home-f-j").title, "Lesson");
+  assert.equal(getPageMeta("/review/home-f-j").title, "Spaced review");
   assert.equal(getPageMeta("/settings").title, "Settings");
 });
 
@@ -30,6 +31,8 @@ test("dashboard makes a due review explicit without hiding the learner's current
   assert.equal(action.kind, "review");
   assert.equal(action.eyebrow, "Spaced review due");
   assert.equal(action.title, "Review: F and J anchors");
+  assert.equal(action.label, "Open review");
+  assert.equal(action.to, "/review/home-f-j");
   assert.match(action.description, /course position is still Lesson 8: R and U/);
   assert.deepEqual(action.secondaryAction, {
     label: "Continue R and U",

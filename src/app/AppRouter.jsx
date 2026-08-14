@@ -17,6 +17,7 @@ const LearnPage = lazyNamed(() => import("@/pages/LearnPage"), "LearnPage");
 const LessonPage = lazyNamed(() => import("@/pages/LessonPage"), "LessonPage");
 const NotFoundPage = lazyNamed(() => import("@/pages/NotFoundPage"), "NotFoundPage");
 const PracticePage = lazyNamed(() => import("@/pages/PracticePage"), "PracticePage");
+const ReviewPage = lazyNamed(() => import("@/pages/ReviewPage"), "ReviewPage");
 const PracticeSessionPage = lazyNamed(() => import("@/pages/PracticeSessionPage"), "PracticeSessionPage");
 const SettingsPage = lazyNamed(() => import("@/pages/SettingsPage"), "SettingsPage");
 const TestSessionPage = lazyNamed(() => import("@/pages/TestSessionPage"), "TestSessionPage");
@@ -48,6 +49,7 @@ export function AppRouter() {
             <Route path="account" element={<AccountPage />} />
             <Route path="learn" element={<LearnPage />} />
             <Route path="learn/:lessonId" element={<LessonPage />} />
+            <Route path="review/:lessonId" element={<ReviewPage />} />
             <Route path="practice" element={<PracticePage />} />
             <Route path="tests" element={<TestsPage />} />
             <Route path="insights" element={<InsightsPage />} />

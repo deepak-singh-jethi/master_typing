@@ -101,5 +101,8 @@ function LessonItem({ lesson, complete, unlocked, current, state }) {
       {unlocked && <ArrowRight className="size-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-500" />}
     </div>
   );
-  return unlocked ? <Link to={`/learn/${lesson.id}`}>{content}</Link> : content;
+  const destination = state === MASTERY_STATES.REVIEW_DUE
+    ? `/review/${lesson.id}`
+    : `/learn/${lesson.id}`;
+  return unlocked ? <Link to={destination}>{content}</Link> : content;
 }

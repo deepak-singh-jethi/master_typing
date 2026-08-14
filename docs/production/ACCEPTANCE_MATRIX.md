@@ -31,7 +31,7 @@ Mobile, tablet, touch-only, alternate keyboard layouts, and browsers outside thi
 
 ## Route inventory
 
-There are 14 user-facing route patterns plus a not-found fallback.
+There are 15 user-facing route patterns plus a not-found fallback.
 
 | Route | Purpose | Critical states |
 |---|---|---|
@@ -40,6 +40,7 @@ There are 14 user-facing route patterns plus a not-found fallback.
 | `/diagnostic` | Two-minute placement diagnostic | idle, running, paused, completed, interrupted/recovered |
 | `/learn` | Course path | locked, active, mastered, placement credit, review due, complete |
 | `/learn/:lessonId` | Lesson guidance and guided/extended work | invalid, locked, learning, transfer, review, complete |
+| `/review/:lessonId` | Dedicated spaced-review entry for a previously mastered lesson | invalid, unavailable, scheduled, due; never silently replays the teaching lesson |
 | `/practice` | Presets and custom session builder | defaults, custom text, advanced controls, validation errors |
 | `/practice/session` | Active practice and result flow | missing config, idle, countdown, typing, pause, recovery, results |
 | `/tests` | Progress checks and proficiency assessments | no history, estimate only, official level, invalid attempts |
