@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  getDashboardReviewAction,
   getPageMeta,
   getPlanCompletionLabel,
   getPrimaryDashboardAction,
@@ -15,42 +14,30 @@ test("page metadata gives every primary route a concise accessible label", () =>
   assert.equal(getPageMeta("/settings").title, "Settings");
 });
 
-test("dashboard keeps course progression primary after setup", () => {
+test("dashboard prioritises setup, reviews, lessons, then benchmarks", () => {
   assert.equal(getPrimaryDashboardAction({ onboardingCompleted: false }).kind, "setup");
-  assert.equal(getPrimaryDashboardAction({
-    onboardingCompleted: true,
-    nextLesson: { id: "y", number: 2, title: "Lesson Y" },
-  }).kind, "lesson");
+  assert.equal(getPrimaryDashboardAction({ onboardingCompleted: true, reviewQueue: [{ lessonId: "x", lesson: { title: "Review X" } }] }).kind, "review");
+  assert.equal(getPrimaryDashboardAction({ onboardingCompleted: true, nextLesson: { id: "y", number: 2, title: "Lesson Y" } }).kind, "lesson");
   assert.equal(getPrimaryDashboardAction({ onboardingCompleted: true }).kind, "benchmark");
 });
 
-test("a due review stays independently visible without replacing the current lesson", () => {
-  const lessonAction = getPrimaryDashboardAction({
+test("dashboard makes a due review explicit without hiding the learner's current lesson", () => {
+  const action = getPrimaryDashboardAction({
     onboardingCompleted: true,
+    reviewQueue: [{ lessonId: "home-f-j", lesson: { title: "F and J anchors" } }],
     nextLesson: { id: "top-r-u", number: 8, title: "R and U" },
   });
-  const reviewAction = getDashboardReviewAction([
-    {
-      lessonId: "home-f-j",
-      lesson: { title: "F and J anchors" },
-      mastery: { dueAt: "2026-08-14T10:00:00.000Z" },
-    },
-    { lessonId: "home-d-k", lesson: { title: "D and K" }, mastery: {} },
-  ]);
 
-  assert.equal(lessonAction.kind, "lesson");
-  assert.equal(lessonAction.title, "R and U");
-  assert.equal(lessonAction.to, "/learn/top-r-u");
-
-  assert.equal(reviewAction.kind, "review");
-  assert.equal(reviewAction.title, "F and J anchors");
-  assert.equal(reviewAction.label, "Start review");
-  assert.equal(reviewAction.to, "/review/home-f-j");
-  assert.equal(reviewAction.dueCount, 2);
-});
-
-test("dashboard review action disappears cleanly when no review is due", () => {
-  assert.equal(getDashboardReviewAction([]), null);
+  assert.equal(action.kind, "review");
+  assert.equal(action.eyebrow, "Spaced review due");
+  assert.equal(action.title, "Review: F and J anchors");
+  assert.equal(action.label, "Open review");
+  assert.equal(action.to, "/review/home-f-j");
+  assert.match(action.description, /course position is still Lesson 8: R and U/);
+  assert.deepEqual(action.secondaryAction, {
+    label: "Continue R and U",
+    to: "/learn/top-r-u",
+  });
 });
 
 test("daily goal labels stay simple and action-oriented", () => {

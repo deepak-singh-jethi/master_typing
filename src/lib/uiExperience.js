@@ -23,7 +23,7 @@ export function getPageMeta(pathname = "/") {
   };
 }
 
-export function getPrimaryDashboardAction({ onboardingCompleted, nextLesson = null }) {
+export function getPrimaryDashboardAction({ onboardingCompleted, reviewQueue = [], nextLesson = null }) {
   if (!onboardingCompleted) {
     return {
       kind: "setup",
@@ -32,6 +32,29 @@ export function getPrimaryDashboardAction({ onboardingCompleted, nextLesson = nu
       description: "Choose your experience, goal, and a realistic daily practice time.",
       label: "Set up my path",
       to: "/welcome",
+    };
+  }
+
+  if (reviewQueue.length > 0) {
+    const review = reviewQueue[0];
+    const currentLessonLabel = nextLesson
+      ? `Lesson ${nextLesson.number}: ${nextLesson.title}`
+      : null;
+    return {
+      kind: "review",
+      eyebrow: "Spaced review due",
+      title: `Review: ${review.lesson?.title || "Earlier lesson"}`,
+      description: currentLessonLabel
+        ? `This earlier lesson is due for a short spaced review. Your course position is still ${currentLessonLabel}.`
+        : "This earlier lesson is due for a short spaced review to protect movement you already learned.",
+      label: "Open review",
+      to: `/review/${review.lessonId}`,
+      secondaryAction: nextLesson
+        ? {
+            label: `Continue ${nextLesson.title}`,
+            to: `/learn/${nextLesson.id}`,
+          }
+        : null,
     };
   }
 
@@ -50,25 +73,9 @@ export function getPrimaryDashboardAction({ onboardingCompleted, nextLesson = nu
     kind: "benchmark",
     eyebrow: "Foundation complete",
     title: "Assess your course level",
-    description: "You have completed the learning path. Use a sustained assessment when you want a comparable measure of pace and accuracy.",
+    description: "Use a sustained three-minute assessment to measure pace and accuracy together.",
     label: "Start assessment",
     to: "/tests/consistency-180",
-  };
-}
-
-export function getDashboardReviewAction(reviewQueue = []) {
-  const review = reviewQueue[0];
-  if (!review) return null;
-
-  return {
-    kind: "review",
-    eyebrow: "Review due",
-    title: review.lesson?.title || "Earlier lesson",
-    description: "Quick retention check for a lesson you have already mastered.",
-    label: "Start review",
-    to: `/review/${review.lessonId}`,
-    dueCount: reviewQueue.length,
-    dueAt: review.mastery?.dueAt ?? null,
   };
 }
 
