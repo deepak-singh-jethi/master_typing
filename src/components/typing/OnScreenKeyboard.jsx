@@ -37,10 +37,51 @@ function needsShift(character) {
   return /[A-Z]/.test(character) || Boolean(shiftedPhysicalKeys[character]);
 }
 
-export function OnScreenKeyboard({ expectedCharacter }) {
+export function OnScreenKeyboard({ expectedCharacter, focusKeys = [], variant = "standard" }) {
   const physicalKey = getPhysicalKey(expectedCharacter);
   const shift = needsShift(expectedCharacter);
   const finger = fingerMap[physicalKey] ?? "Use the assigned finger";
+  const lessonFocus = variant === "lesson-focus";
+  const focusPhysicalKeys = new Set(focusKeys.map((key) => getPhysicalKey(key)));
+
+  if (lessonFocus) {
+    const keyboardRows = [
+      [{ label: "~", key: "`" }, { label: "!", key: "1" }, { label: "@", key: "2" }, { label: "#", key: "3" }, { label: "$", key: "4" }, { label: "%", key: "5" }, { label: "^", key: "6" }, { label: "&", key: "7" }, { label: "*", key: "8" }, { label: "(", key: "9" }, { label: ")", key: "0" }, { label: "−", key: "-" }, { label: "+", key: "=" }, { label: "⌫", key: "Backspace", wide: "w-16" }],
+      [{ label: "Tab", key: "Tab", wide: "w-16" }, ...["q","w","e","r","t","y","u","i","o","p","[","]","\\"].map((key) => ({ label: key.toUpperCase(), key }))],
+      [{ label: "Caps", key: "Caps", wide: "w-[4.6rem]" }, ...["a","s","d","f","g","h","j","k","l",";","'"].map((key) => ({ label: key.toUpperCase(), key })), { label: "Enter", key: "Enter", wide: "w-[4.8rem]" }],
+      [{ label: "Shift", key: "Shift", wide: "w-24" }, ...["z","x","c","v","b","n","m",",",".","/"].map((key) => ({ label: key.toUpperCase(), key })), { label: "Shift", key: "Shift", wide: "w-24" }],
+      [{ label: "Space", key: "Space", wide: "w-[34rem]" }],
+    ];
+
+    return (
+      <section aria-hidden="true" className="hidden sm:block">
+        <div className="mx-auto max-w-5xl space-y-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {keyboardRows.map((row, rowIndex) => (
+            <div key={rowIndex} className="flex min-w-[760px] justify-center gap-1.5">
+              {row.map((item, keyIndex) => {
+                const active = item.key === physicalKey || (item.key === "Shift" && shift);
+                const focus = focusPhysicalKeys.has(item.key);
+                return (
+                  <div
+                    key={`${item.key}-${keyIndex}`}
+                    className={cn(
+                      "grid h-10 min-w-11 place-items-center rounded-lg border border-slate-200 bg-slate-100 px-2 font-sans text-xs font-medium text-slate-600 shadow-[inset_0_-1px_0_rgba(15,23,42,0.08)] transition dark:border-slate-800 dark:bg-[#111b2a] dark:text-slate-300 dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)]",
+                      item.wide,
+                      focus && "border-violet-500/60 bg-violet-600 text-white shadow-[0_0_18px_rgba(124,58,237,0.16)] dark:bg-violet-600 dark:text-white",
+                      active && !focus && "border-indigo-400 bg-indigo-50 text-indigo-700 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-indigo-200",
+                      active && focus && "ring-2 ring-violet-300/50 dark:ring-violet-400/35",
+                    )}
+                  >
+                    {item.label}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section aria-hidden="true" className="hidden rounded-3xl border border-slate-200 bg-white p-4 sm:block dark:border-slate-800 dark:bg-slate-900">

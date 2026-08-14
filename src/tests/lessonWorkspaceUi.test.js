@@ -6,33 +6,62 @@ function source(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 }
 
-test("lesson workspace establishes context, guided path, then typing controls in that order", () => {
+test("lesson page puts lesson identity and guided progress before the typing surface", () => {
   const lesson = source("pages/LessonPage.jsx");
-  assert.match(lesson, /Lesson \{lesson\.number\}/);
-  assert.match(lesson, /const sessionControls = practiceMode === "guided" \? \([\s\S]*?\{lessonPath\}[\s\S]*?\{modeControl\}[\s\S]*?Current objective/);
-  assert.match(lesson, /Complete the steps in order\. Your progress is saved after every valid pass\./);
-  assert.match(lesson, /Recommended/);
+  const titleIndex = lesson.indexOf('id="lesson-focus-title"');
+  const stepsIndex = lesson.indexOf('{practiceMode === "guided" ? lessonPath');
+  const workspaceIndex = lesson.lastIndexOf('layout="lesson-focus"');
+  assert.ok(titleIndex >= 0 && stepsIndex > titleIndex && workspaceIndex > stepsIndex);
+  assert.match(lesson, /Step \{exerciseIndex \+ 1\} of \{lesson\.exercises\.length\}/);
+  assert.match(lesson, /done \? "Completed" : active \? "In progress" : "Upcoming"/);
+  assert.match(lesson, /Lesson map/);
 });
 
-test("guided exercises communicate completed current and next state without exposing locked steps", () => {
+test("practice modes remain available without taking over the primary lesson hierarchy", () => {
   const lesson = source("pages/LessonPage.jsx");
-  assert.match(lesson, /done \? "Completed" : active \? "Current step" : "Next"/);
-  assert.match(lesson, /disabled=\{!available\}/);
-  assert.match(lesson, /aria-current=\{active \? "step" : undefined\}/);
-  assert.match(lesson, /\{guidedPassedCount\}\/\{lesson\.exercises\.length\} complete/);
+  assert.match(lesson, /<details className="group relative z-20">/);
+  assert.match(lesson, /Practice mode/);
+  assert.match(lesson, /Fresh guided text/);
+  assert.doesNotMatch(lesson, /Guided lesson path/);
+  assert.doesNotMatch(lesson, /Current objective/);
 });
 
-test("typing surface clearly exposes ready running paused and resume states", () => {
+test("focused typing workspace makes metrics then typing then keyboard the dominant visual flow", () => {
   const workspace = source("components/typing/TypingWorkspace.jsx");
-  assert.match(workspace, /Ready for your first key/);
-  assert.match(workspace, /Keep typing/);
-  assert.match(workspace, /Your position and timer are safe\. Resume when ready\./);
-  assert.match(workspace, /Click here to continue typing/);
-  assert.match(workspace, /Start typing — timing begins with your first accepted character\./);
-  assert.match(workspace, /sm:hidden">Next:/);
+  const metricIndex = workspace.indexOf('<FocusMetric tone="emerald" label="Accuracy"');
+  const typingIndex = workspace.indexOf('aria-label="Typing practice area"');
+  const keyboardIndex = workspace.indexOf('variant="lesson-focus"');
+  assert.ok(metricIndex >= 0 && typingIndex > metricIndex && keyboardIndex > typingIndex);
+  assert.match(workspace, /Keep typing…/);
+  assert.match(workspace, /min-h-\[22rem\]/);
+  assert.match(workspace, /Keyboard guide/);
+  assert.match(workspace, /lessonTip \|\| description/);
 });
 
-test("guided result screen prioritises accuracy and gives an explicit next step", () => {
+test("lesson keyboard keeps source focus keys visible while still tracking the next physical key", () => {
+  const keyboard = source("components/typing/OnScreenKeyboard.jsx");
+  assert.match(keyboard, /focusPhysicalKeys = new Set/);
+  assert.match(keyboard, /focus && "border-violet-500\/60 bg-violet-600/);
+  assert.match(keyboard, /active && focus && "ring-2/);
+  assert.match(keyboard, /label: "Tab"/);
+  assert.match(keyboard, /label: "Caps"/);
+  assert.match(keyboard, /label: "Enter"/);
+  assert.match(keyboard, /label: "Space"/);
+});
+
+test("focused lesson routes use the wider distraction-reduced shell", () => {
+  const shell = source("components/layout/AppShell.jsx");
+  const header = source("components/layout/Header.jsx");
+  const sidebar = source("components/layout/Sidebar.jsx");
+  assert.match(shell, /max-w-\[1360px\] py-4/);
+  assert.match(header, /focusedLesson/);
+  assert.match(header, /max-w-\[1360px\]/);
+  assert.match(sidebar, /Course progress/);
+  assert.match(sidebar, /Current streak/);
+  assert.match(sidebar, /Daily goal/);
+});
+
+test("guided result screen still prioritises accuracy and gives an explicit next step", () => {
   const lesson = source("pages/LessonPage.jsx");
   const results = source("components/typing/SessionResults.jsx");
   assert.match(lesson, /nextExerciseTitle:/);
@@ -45,14 +74,7 @@ test("guided result screen prioritises accuracy and gives an explicit next step"
   assert.ok(accuracy > guidedMetricStart && wpm > accuracy);
 });
 
-test("mastery detail is progressive disclosure instead of blocking the primary next action", () => {
-  const results = source("components/typing/SessionResults.jsx");
-  assert.match(results, /<details className="group rounded-3xl border border-violet-200/);
-  assert.match(results, /View requirements/);
-  assert.match(results, /Next priority:/);
-});
-
-test("lesson completion clearly moves forward and explains automatic spaced review", () => {
+test("lesson completion still explains automatic spaced review and forward progression", () => {
   const lesson = source("pages/LessonPage.jsx");
   assert.match(lesson, /Review is handled automatically/);
   assert.match(lesson, /short spaced review when it is actually due/);

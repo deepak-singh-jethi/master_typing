@@ -1,16 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   Check,
-  CheckCircle2,
-  Circle,
-  Clock3,
-  Keyboard,
+  ChevronDown,
+  ChevronRight,
   LockKeyhole,
   RefreshCcw,
+  SlidersHorizontal,
   Repeat2,
   Timer,
   Trophy,
@@ -23,7 +21,6 @@ import { useApp } from "@/hooks/useApp";
 import {
   getLessonById,
   getNextLesson,
-  getPreviousLesson,
 } from "@/data/curriculum";
 import {
   assessGuidedAttempt,
@@ -70,7 +67,6 @@ function LessonPageContent({ lessonId }) {
   const navigate = useNavigate();
   const { data, recordSession, completeLesson } = useApp();
   const lesson = getLessonById(lessonId);
-  const previousLesson = lesson ? getPreviousLesson(lesson.id) : null;
   const nextLesson = lesson ? getNextLesson(lesson.id) : null;
   const unlocked = lesson ? isAdaptiveLessonUnlocked(lesson.id, data) : false;
   const alreadyComplete = lesson ? data.progress.completedLessons.includes(lesson.id) : false;
@@ -360,36 +356,73 @@ function LessonPageContent({ lessonId }) {
   };
 
   const guidedPassedCount = passedExercises.filter((index) => index < lesson.exercises.length).length;
-  const lessonProgressPercent = Math.round((guidedPassedCount / Math.max(1, lesson.exercises.length)) * 100);
+  const guidedPositionPercent = Math.round(((exerciseIndex + 1) / Math.max(1, lesson.exercises.length)) * 100);
 
   const modeControl = (
-    <div className="min-w-0">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Mode</p>
-        {practiceMode === "guided" && (
-          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">Recommended</span>
+    <SegmentedControl
+      value={practiceMode}
+      onChange={(value) => { setPracticeMode(value); resetGeneratedText(); }}
+      options={practiceModes}
+      label="Lesson practice mode"
+      className="w-full rounded-xl p-1 [&>button]:min-h-10 [&>button]:flex-1 [&>button]:rounded-lg [&>button]:px-3 [&>button]:py-1.5"
+    />
+  );
+
+  const practiceOptions = (
+    <details className="group relative z-20">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-950 marker:hidden dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white">
+        <SlidersHorizontal className="size-4" aria-hidden="true" />
+        {practiceMode === "guided" ? "Guided" : practiceMode === "longer" ? "Longer text" : "Timed"}
+        <ChevronDown className="size-3.5 transition group-open:rotate-180" aria-hidden="true" />
+      </summary>
+      <div className="absolute right-0 top-full mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-950/10 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/30">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Practice mode</p>
+        <div className="mt-2">{modeControl}</div>
+        {practiceMode === "guided" ? (
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <div>
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Fresh guided text</p>
+              <p className="mt-0.5 text-[10px] leading-4 text-slate-400">Same skill target, new material.</p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={generateFreshGuidedText}>
+              <RefreshCcw className="size-3.5" />Fresh text
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              {practiceMode === "longer" ? "Text length" : "Session timer"}
+            </p>
+            <div className="mt-2">
+              {practiceMode === "longer" ? (
+                <ControlGroup icon={Repeat2} label="Length">
+                  {[100, 200, 300, 500].map((value) => (
+                    <ChoiceButton key={value} active={wordCount === value} onClick={() => { setWordCount(value); resetGeneratedText(); }}>{value}</ChoiceButton>
+                  ))}
+                  <span className="text-[10px] text-slate-400">words</span>
+                </ControlGroup>
+              ) : (
+                <ControlGroup icon={Timer} label="Timer">
+                  {[60, 180, 300, 600].map((value) => (
+                    <ChoiceButton key={value} active={durationSeconds === value} onClick={() => { setDurationSeconds(value); resetGeneratedText(); }}>{value / 60} min</ChoiceButton>
+                  ))}
+                </ControlGroup>
+              )}
+            </div>
+            <Button variant="secondary" size="sm" className="mt-4 w-full" onClick={resetGeneratedText}>
+              <RefreshCcw className="size-3.5" />New text
+            </Button>
+          </div>
         )}
       </div>
-      <SegmentedControl
-        value={practiceMode}
-        onChange={(value) => { setPracticeMode(value); resetGeneratedText(); }}
-        options={practiceModes}
-        label="Lesson practice mode"
-        className="w-full rounded-xl p-1 [&>button]:min-h-10 [&>button]:flex-1 [&>button]:rounded-lg [&>button]:px-3 [&>button]:py-1.5"
-      />
-    </div>
+    </details>
   );
 
   const lessonPath = (
-    <div>
-      <div className="mb-2.5 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Guided lesson path</p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Complete the steps in order. Your progress is saved after every valid pass.</p>
-        </div>
-        <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500 dark:text-slate-300">{guidedPassedCount}/{lesson.exercises.length} complete</span>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-3" role="group" aria-label="Guided exercise">
+    <div className="relative mt-5">
+      <div className="pointer-events-none absolute left-[11%] right-[11%] top-9 hidden h-px bg-slate-200 sm:block dark:bg-slate-800" aria-hidden="true" />
+      <div className="pointer-events-none absolute left-[11%] top-9 hidden h-px bg-gradient-to-r from-emerald-500 via-indigo-500 to-violet-500 sm:block" style={{ width: `${Math.max(0, (exerciseIndex / Math.max(1, lesson.exercises.length - 1)) * 78)}%` }} aria-hidden="true" />
+      <div className="relative grid gap-3 sm:grid-cols-3" role="group" aria-label="Guided lesson steps">
         {lesson.exercises.map((item, index) => {
           const done = passedExercises.includes(index) || index < exerciseIndex;
           const active = index === exerciseIndex;
@@ -406,33 +439,32 @@ function LessonPageContent({ lessonId }) {
                 resetGeneratedText();
               }}
               className={cn(
-                "group relative flex min-h-[4.6rem] items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/15 disabled:cursor-not-allowed",
-                active && "border-indigo-300 bg-indigo-50/90 shadow-[0_8px_24px_-20px_rgba(79,70,229,0.55)] dark:border-indigo-500/35 dark:bg-indigo-500/10",
-                done && !active && "border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/25 dark:bg-emerald-500/[0.07]",
-                !done && !active && "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900",
-                !available && "opacity-55",
+                "relative z-10 flex min-h-[4.6rem] items-center gap-4 rounded-2xl border px-5 py-3.5 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/15 disabled:cursor-not-allowed",
+                active && "border-violet-500 bg-violet-50/80 shadow-[0_0_0_1px_rgba(139,92,246,0.18),0_14px_35px_-24px_rgba(124,58,237,0.8)] dark:bg-violet-500/[0.08]",
+                done && !active && "border-emerald-500/35 bg-emerald-50/55 dark:bg-emerald-500/[0.06]",
+                !done && !active && "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/70",
+                !available && "opacity-65",
               )}
             >
               <span className={cn(
-                "grid size-8 shrink-0 place-items-center rounded-xl text-xs font-bold",
-                active && "bg-indigo-600 text-white shadow-sm shadow-indigo-600/20",
-                done && !active && "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-                !done && !active && "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300",
+                "grid size-10 shrink-0 place-items-center rounded-full border text-sm font-bold",
+                active && "border-violet-400 bg-violet-600 text-white shadow-[0_0_24px_rgba(124,58,237,0.35)]",
+                done && !active && "border-emerald-400/60 bg-emerald-500 text-white",
+                !done && !active && "border-slate-300 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
               )}>
-                {done ? <Check className="size-4" aria-hidden="true" /> : active ? index + 1 : <Circle className="size-4" aria-hidden="true" />}
+                {done ? <Check className="size-4" aria-hidden="true" /> : index + 1}
               </span>
               <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-slate-950 dark:text-white">{item.title}</span>
                 <span className={cn(
-                  "block text-[10px] font-semibold uppercase tracking-[0.12em]",
-                  active && "text-indigo-600 dark:text-indigo-300",
+                  "mt-1 block text-xs font-medium",
+                  active && "text-violet-600 dark:text-violet-300",
                   done && !active && "text-emerald-600 dark:text-emerald-300",
                   !done && !active && "text-slate-400",
                 )}>
-                  {done ? "Completed" : active ? "Current step" : "Next"}
+                  {done ? "Completed" : active ? "In progress" : "Upcoming"}
                 </span>
-                <span className="mt-0.5 block truncate text-xs font-semibold text-slate-900 dark:text-white">{item.title}</span>
               </span>
-              {active && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-indigo-500" />}
             </button>
           );
         })}
@@ -440,99 +472,52 @@ function LessonPageContent({ lessonId }) {
     </div>
   );
 
-  const sessionControls = practiceMode === "guided" ? (
-    <div className="space-y-4">
-      {lessonPath}
-      <div className="grid gap-3 border-t border-slate-200/80 pt-4 lg:grid-cols-[17rem_minmax(0,1fr)_auto] lg:items-end dark:border-slate-800">
-        {modeControl}
-        <div className="min-w-0 rounded-2xl bg-slate-100/70 px-4 py-3 dark:bg-slate-800/55">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Current objective</p>
-              <p className="mt-1 text-xs font-semibold text-slate-800 dark:text-slate-100">{exercise.title}</p>
-            </div>
-            <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-500 shadow-sm dark:bg-slate-900 dark:text-slate-300">{guidedRequirements.accuracy}% accuracy</span>
-          </div>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="h-10 w-full px-3 lg:w-auto"
-          onClick={generateFreshGuidedText}
-          aria-label="Generate fresh guided text"
-        >
-          <RefreshCcw className="size-3.5" aria-hidden="true" />Fresh text
-        </Button>
-      </div>
-    </div>
-  ) : (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/55 px-4 py-3 text-xs leading-5 text-indigo-800 dark:border-indigo-500/20 dark:bg-indigo-500/[0.06] dark:text-indigo-200">
-        Extra practice strengthens this lesson, but only the Guided mode advances the three-step lesson path.
-      </div>
-      <div className="grid gap-3 lg:grid-cols-[17rem_minmax(0,1fr)_auto] lg:items-end">
-        {modeControl}
-        <div className="min-w-0">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            {practiceMode === "longer" ? "Text length" : "Session timer"}
-          </p>
-          {practiceMode === "longer" ? (
-            <ControlGroup icon={Repeat2} label="Length">
-              {[100, 200, 300, 500].map((value) => (
-                <ChoiceButton key={value} active={wordCount === value} onClick={() => { setWordCount(value); resetGeneratedText(); }}>{value}</ChoiceButton>
-              ))}
-              <span className="text-[10px] text-slate-400">words</span>
-            </ControlGroup>
-          ) : (
-            <ControlGroup icon={Timer} label="Timer">
-              {[60, 180, 300, 600].map((value) => (
-                <ChoiceButton key={value} active={durationSeconds === value} onClick={() => { setDurationSeconds(value); resetGeneratedText(); }}>{value / 60} min</ChoiceButton>
-              ))}
-            </ControlGroup>
-          )}
-        </div>
-        <Button variant="secondary" size="sm" className="h-10 w-full px-3 lg:w-auto" onClick={resetGeneratedText}>
-          <RefreshCcw className="size-3.5" aria-hidden="true" />New text
-        </Button>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="mx-auto max-w-[1160px] space-y-4 sm:space-y-5">
-      <Card className="relative isolate overflow-hidden border-slate-200/90 p-0 shadow-[0_14px_40px_-34px_rgba(15,23,42,0.32)] dark:border-slate-800">
-        <div className="pointer-events-none absolute -right-14 -top-20 -z-10 size-56 rounded-full bg-indigo-100/55 blur-3xl dark:bg-indigo-500/10" />
-        <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="mx-auto max-w-[1320px] space-y-5">
+      <section aria-labelledby="lesson-focus-title" className="px-1">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.72fr)_auto] lg:items-end">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <Link to="/learn" className="inline-flex items-center gap-1.5 font-semibold text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">
-                <ArrowLeft className="size-3.5" aria-hidden="true" />Course
-              </Link>
-              <span className="text-slate-300 dark:text-slate-700" aria-hidden="true">/</span>
-              <span className="font-semibold text-indigo-600 dark:text-indigo-300">Lesson {lesson.number}</span>
-              {alreadyComplete && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">Mastered · practice revisit</span>}
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
+              <Link to="/learn" className="text-violet-600 transition hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300">Learn</Link>
+              <ChevronRight className="size-3.5 text-slate-400" aria-hidden="true" />
+              <span className="text-slate-700 dark:text-slate-200">Lesson {lesson.number}</span>
+              {alreadyComplete && <span className="ml-2 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">Mastered</span>}
             </div>
-            <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h1 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-3xl dark:text-white">{lesson.title}</h1>
-              <span className="text-sm font-medium text-slate-400">{lesson.subtitle}</span>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <h1 id="lesson-focus-title" className="text-3xl font-semibold tracking-[-0.045em] text-slate-950 dark:text-white">{lesson.title}</h1>
+              <span className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-violet-600/20">Lesson {lesson.number}</span>
             </div>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">{lesson.technique}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"><Clock3 className="size-3.5" />{lesson.estimatedMinutes} min</span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300"><Keyboard className="size-3.5" />{practiceMode === "guided" ? `Step ${exerciseIndex + 1} of ${lesson.exercises.length}` : "Extra practice"}</span>
-              {practiceMode === "guided" && <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><CheckCircle2 className="size-3.5" />{lessonProgressPercent}% path complete</span>}
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">{lesson.subtitle}.</p>
+          </div>
+
+          <div className="min-w-0 pb-1">
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold">
+              <span className="text-slate-800 dark:text-slate-100">Step {exerciseIndex + 1} of {lesson.exercises.length}</span>
+              <span className="text-slate-400">{guidedPassedCount} complete</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+              <div className="h-full rounded-full bg-gradient-to-r from-violet-600 to-indigo-500 transition-[width] duration-300" style={{ width: `${guidedPositionPercent}%` }} />
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col lg:items-stretch">
-            <Button as={Link} to="/learn" variant="secondary" size="sm"><BookOpen className="size-4" />Lesson map</Button>
-            <p className="px-1 text-[10px] font-medium text-slate-400 sm:self-center lg:text-center">{data.settings.backspaceMode === "disabled" ? "Backspace off" : "Backspace on"} · Esc pauses</p>
+          <div className="flex items-center gap-2 lg:justify-end">
+            {practiceOptions}
+            <Button as={Link} to="/learn" variant="secondary" size="sm" className="min-h-11 px-4">
+              <BookOpen className="size-4" />Lesson map
+            </Button>
           </div>
         </div>
-      </Card>
+
+        {practiceMode === "guided" ? lessonPath : (
+          <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50/65 px-5 py-4 text-sm text-violet-900 dark:border-violet-500/20 dark:bg-violet-500/[0.07] dark:text-violet-100">
+            <span className="font-semibold">Extra lesson practice.</span> This mode strengthens {lesson.title} but does not replace the guided three-step path.
+          </div>
+        )}
+      </section>
 
       <TypingWorkspace
         key={`${lesson.id}-${exerciseIndex}-${practiceMode}-${wordCount}-${durationSeconds}-${seed}`}
+        layout="lesson-focus"
         sessionLabel={practiceMode === "guided" ? exercise.cumulativeReview ? "Module review check" : exercise.stage === "transfer" ? "Unseen transfer check" : `Exercise ${exerciseIndex + 1} of ${lesson.exercises.length}` : practiceMode === "timed" ? "Timed lesson practice" : "Extended lesson practice"}
         title={practiceMode === "guided" ? exercise.title : practiceMode === "timed" ? `${durationSeconds / 60}-minute ${lesson.title} practice` : `${wordCount}-word ${lesson.title} practice`}
         description={practiceMode === "guided" ? `${exercise.description}${exercise.stage === "transfer" ? " This target is freshly generated and checks independent control." : ""}` : "This text uses only keys already available in this lesson. Extra practice is saved but does not skip the guided path."}
@@ -548,6 +533,8 @@ function LessonPageContent({ lessonId }) {
         backspaceMode={data.settings.backspaceMode}
         textSize={data.settings.textSize}
         caretStyle={data.settings.caretStyle}
+        lessonTip={lesson.technique}
+        focusKeys={lesson.focusKeys}
         onComplete={handleComplete}
         onContinue={handleContinue}
         onResultRetry={practiceMode === "guided" ? generateFreshGuidedText : undefined}
@@ -572,28 +559,10 @@ function LessonPageContent({ lessonId }) {
         } : null}
         comparison={comparison}
         masteryBlockers={practiceMode === "guided" ? masteryBlockers : []}
-        sessionControls={sessionControls}
         showSessionNav={false}
         exitTo="/learn"
         exitLabel="Exit lesson"
       />
-
-      <nav aria-label="Lesson navigation" className="flex items-center justify-between gap-4 border-t border-slate-200 pt-4 dark:border-slate-800">
-        {previousLesson ? (
-          <Link to={`/learn/${previousLesson.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">
-            <ArrowLeft className="size-4" />Previous lesson
-          </Link>
-        ) : <span />}
-        {alreadyComplete && nextLesson && isAdaptiveLessonUnlocked(nextLesson.id, data) ? (
-          <Link to={`/learn/${nextLesson.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">
-            Next lesson<ArrowRight className="size-4" />
-          </Link>
-        ) : (
-          <Link to="/learn" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">
-            Course map<BookOpen className="size-4" />
-          </Link>
-        )}
-      </nav>
     </div>
   );
 }

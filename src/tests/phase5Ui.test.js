@@ -129,17 +129,18 @@ test("the core learning path explains placement credit and links course progress
   assert.match(sidebar, /Open learning path/);
 });
 
-test("lesson mode, length, and fresh-text controls stay attached to the typing workspace", () => {
+test("lesson practice options remain accessible without displacing the focused typing workspace", () => {
   const lesson = source("pages/LessonPage.jsx");
   const workspace = source("components/typing/TypingWorkspace.jsx");
-  assert.match(lesson, /sessionControls=\{sessionControls\}/);
-  assert.match(lesson, /showSessionNav=\{false\}/);
-  assert.match(lesson, />Mode</);
+  assert.match(lesson, /<details className="group relative z-20">/);
+  assert.match(lesson, /Practice mode/);
   assert.match(lesson, /label="Length"/);
+  assert.match(lesson, /Fresh guided text/);
   assert.match(lesson, /<Button[^>]*onClick=\{resetGeneratedText\}[^>]*>[\s\S]*?New text[\s\S]*?<\/Button>/);
   assert.match(lesson, /role="group" aria-label=\{label\}/);
   assert.match(lesson, /aria-pressed=\{active\}/);
-  assert.match(workspace, /\{sessionControls\}/);
+  assert.match(lesson, /layout="lesson-focus"/);
+  assert.match(workspace, /layout = "standard"/);
 });
 
 test("technical storage controls are collapsed and account errors use alert semantics", () => {
