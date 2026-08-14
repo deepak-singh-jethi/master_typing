@@ -18,6 +18,7 @@ const LessonPage = lazyNamed(() => import("@/pages/LessonPage"), "LessonPage");
 const NotFoundPage = lazyNamed(() => import("@/pages/NotFoundPage"), "NotFoundPage");
 const PracticePage = lazyNamed(() => import("@/pages/PracticePage"), "PracticePage");
 const ReviewPage = lazyNamed(() => import("@/pages/ReviewPage"), "ReviewPage");
+const ReviewSessionPage = lazyNamed(() => import("@/pages/ReviewSessionPage"), "ReviewSessionPage");
 const PracticeSessionPage = lazyNamed(() => import("@/pages/PracticeSessionPage"), "PracticeSessionPage");
 const SettingsPage = lazyNamed(() => import("@/pages/SettingsPage"), "SettingsPage");
 const TestSessionPage = lazyNamed(() => import("@/pages/TestSessionPage"), "TestSessionPage");
@@ -59,6 +60,7 @@ export function AppRouter() {
 
           <Route element={<SessionShell />}>
             <Route path="practice/session" element={<PracticeSessionPage />} />
+            <Route path="review/:lessonId/session" element={<ReviewSessionPage />} />
             <Route path="tests/:testId" element={<TestSessionPage />} />
             <Route path="diagnostic" element={<DiagnosticPage />} />
           </Route>

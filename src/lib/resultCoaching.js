@@ -171,6 +171,22 @@ export function getPrimaryDiagnosis({
     };
   }
 
+  if (resultContext?.purpose === "spaced-review") {
+    const transfer = resultContext.reviewStage === "fresh-transfer";
+    return {
+      tone: "indigo",
+      code: transfer ? "spaced-review-transfer" : "spaced-review-recall",
+      eyebrow: transfer ? "Fresh transfer captured" : "Cold recall captured",
+      title: transfer ? "The retention check has both stages" : "The first retention stage is complete",
+      summary: transfer
+        ? `Fresh material was typed at ${Math.round(accuracy)}% accuracy. This stage checks the learned movement outside the first recall pattern.`
+        : `The movement was recalled at ${Math.round(accuracy)}% accuracy before any lesson replay or reteaching.`,
+      action: transfer
+        ? "Finish the review practice. Scheduling and pass/fail decisions are intentionally handled in the next review phase."
+        : "Continue to fresh transfer so the same movement is checked in new curriculum-safe material.",
+    };
+  }
+
   if (accuracy < passAccuracy) {
     const gap = rounded(passAccuracy - accuracy);
     return {

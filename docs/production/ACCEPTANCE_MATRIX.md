@@ -31,7 +31,7 @@ Mobile, tablet, touch-only, alternate keyboard layouts, and browsers outside thi
 
 ## Route inventory
 
-There are 15 user-facing route patterns plus a not-found fallback.
+There are 16 user-facing route patterns plus a not-found fallback.
 
 | Route | Purpose | Critical states |
 |---|---|---|
@@ -41,6 +41,7 @@ There are 15 user-facing route patterns plus a not-found fallback.
 | `/learn` | Course path | locked, active, mastered, placement credit, review due, complete |
 | `/learn/:lessonId` | Lesson guidance and guided/extended work | invalid, locked, learning, transfer, review, complete |
 | `/review/:lessonId` | Dedicated spaced-review entry for a previously mastered lesson | invalid, unavailable, scheduled, due; never silently replays the teaching lesson |
+| `/review/:lessonId/session` | Short spaced-review retention session | due-only entry, cold recall, fresh transfer, refresh/recovery; source-lesson character boundary is mandatory |
 | `/practice` | Presets and custom session builder | defaults, custom text, advanced controls, validation errors |
 | `/practice/session` | Active practice and result flow | missing config, idle, countdown, typing, pause, recovery, results |
 | `/tests` | Progress checks and proficiency assessments | no history, estimate only, official level, invalid attempts |
@@ -62,7 +63,7 @@ Each mandatory journey must pass on Chrome/Windows and Safari/macOS. Journeys ma
 | J-02 | Skip setup | empty browser storage | Safe beginner defaults are saved; Today has one obvious next action | automated + manual |
 | J-03 | Diagnostic placement | beginner and verified touch-typist profiles | Interruption never grants credit; valid completion applies only allowed placement credit | automated + manual typing |
 | J-04 | Guided lesson mastery | unlocked lesson | Exercises use allowed keys, distinct requirements are visible, mastery requires valid staged evidence, next lesson unlocks once | automated + cross-browser manual |
-| J-05 | Spaced and cumulative review | mastered/due lesson and module checkpoint | Reviews appear before new work; failure remains due; completion extends the interval exactly once | automated + manual |
+| J-05 | Spaced and cumulative review | mastered/due lesson and module checkpoint | Reviews appear before new work; spaced review uses cold recall then fresh curriculum-safe transfer instead of lesson replay; failure remains due; completion extends the interval exactly once | automated + manual |
 | J-06 | Ready-made practice | history with weak keys | Generated text reflects recipe/evidence; session and result save; new text differs while preserving purpose | automated + manual |
 | J-07 | Custom practice builder | guest and account | All supported purpose/content/goal options validate; custom text saves/deletes; long session has enough content | automated + manual |
 | J-08 | Progress and proficiency assessments | no history and existing history | 1-minute result is estimate only; 3/5-minute valid tests classify within allowed level; invalid runs do not set bests/levels | automated + manual |

@@ -74,10 +74,10 @@ test("router and course links send due reviews to the dedicated review route", (
   assert.doesNotMatch(dashboard, /label: "Start review",\s*to: `\/learn\/\$\{review\.lessonId\}`/);
 });
 
-test("dedicated review page does not record lesson mastery or masquerade the old lesson as review", () => {
+test("dedicated review entry stays separate from lesson mastery and the original teaching flow", () => {
   const reviewPage = source("pages/ReviewPage.jsx");
   assert.match(reviewPage, /Start short review/);
-  assert.match(reviewPage, /disabled aria-disabled="true"/);
+  assert.match(reviewPage, /review\.reviewSessionRoute/);
   assert.match(reviewPage, /Revisit full lesson/);
   assert.doesNotMatch(reviewPage, /completeLesson|recordSession|applyGuidedLessonResult|finaliseLessonMastery/);
 });

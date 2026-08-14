@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, BookOpenCheck, CalendarClock, Clock3, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { Card } from "@/components/common/Card";
@@ -19,6 +19,7 @@ function formatDueDate(value) {
 
 export function ReviewPage() {
   const { lessonId } = useParams();
+  const location = useLocation();
   const { data } = useApp();
   const lesson = getLessonById(lessonId);
   const mastery = lesson ? data.progress.lessonMastery?.[lesson.id] ?? {} : {};
@@ -107,21 +108,40 @@ export function ReviewPage() {
         </div>
       </Card>
 
+      {location.state?.reviewSessionCompleted && (
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-500/25 dark:bg-indigo-500/10 dark:text-indigo-200" role="status">
+          <p className="font-semibold">Short review practice completed</p>
+          <p className="mt-1 text-xs leading-5 text-indigo-700 dark:text-indigo-300">
+            Both retention stages were completed. Review scoring and interval advancement are deliberately unchanged in this build, so this lesson remains due until the next phase connects review evidence to the scheduler.
+          </p>
+        </div>
+      )}
+
       <Card as="section" aria-labelledby="review-session-title" className="p-6 sm:p-7">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Review session</p>
-            <h2 id="review-session-title" className="mt-2 text-xl font-semibold text-slate-950 dark:text-white">Short retention practice belongs here</h2>
+            <h2 id="review-session-title" className="mt-2 text-xl font-semibold text-slate-950 dark:text-white">Cold recall, then fresh transfer</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              The review route and lesson context are now isolated from the teaching lesson. The short curriculum-safe review content is intentionally not substituted with the old three-exercise lesson flow.
+              Start with a 30-second recall check before any reteaching, then use 60 seconds of fresh curriculum-safe material. The session never introduces a key that was unavailable in this lesson.
             </p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <span className="rounded-xl bg-slate-100 px-3 py-1.5 dark:bg-slate-800">1 · Cold recall · 30 sec</span>
+              <span className="rounded-xl bg-slate-100 px-3 py-1.5 dark:bg-slate-800">2 · Fresh transfer · 60 sec</span>
+            </div>
           </div>
-          <Button variant="brand" size="lg" disabled aria-disabled="true">
-            Start short review
-          </Button>
+          {review.canReview ? (
+            <Button as={Link} to={review.reviewSessionRoute} variant="brand" size="lg">
+              Start short review<ArrowRight className="size-4" aria-hidden="true" />
+            </Button>
+          ) : (
+            <Button variant="brand" size="lg" disabled aria-disabled="true">
+              Review not due yet
+            </Button>
+          )}
         </div>
         <p className="mt-4 text-xs leading-5 text-slate-400">
-          Review generation is not enabled in this phase, so completing the old lesson cannot accidentally count as a spaced review.
+          This phase generates and runs the dedicated review session only. It does not yet pass, fail, or advance the spaced-review interval.
         </p>
       </Card>
 

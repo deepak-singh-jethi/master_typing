@@ -69,7 +69,9 @@ export function SessionResults({
           "rounded-3xl border p-5 sm:p-7",
           diagnosis.tone === "emerald"
             ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-500/25 dark:bg-emerald-500/10"
-            : "border-amber-200 bg-amber-50/80 dark:border-amber-500/25 dark:bg-amber-500/10",
+            : diagnosis.tone === "indigo"
+              ? "border-indigo-200 bg-indigo-50/80 dark:border-indigo-500/25 dark:bg-indigo-500/10"
+              : "border-amber-200 bg-amber-50/80 dark:border-amber-500/25 dark:bg-amber-500/10",
         )}
       >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -78,11 +80,15 @@ export function SessionResults({
               "grid size-11 shrink-0 place-items-center rounded-2xl sm:size-12",
               diagnosis.tone === "emerald"
                 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+                : diagnosis.tone === "indigo"
+                  ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
+                  : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
             )}>
               {diagnosis.tone === "emerald"
                 ? <CheckCircle2 className="size-6" aria-hidden="true" />
-                : <TriangleAlert className="size-6" aria-hidden="true" />}
+                : diagnosis.tone === "indigo"
+                  ? <RefreshCcw className="size-6" aria-hidden="true" />
+                  : <TriangleAlert className="size-6" aria-hidden="true" />}
             </span>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{diagnosis.eyebrow}</p>
@@ -163,7 +169,7 @@ export function SessionResults({
             </div>
           )}
 
-          {resultContext && <RecipeSummary context={resultContext} />}
+          {resultContext && resultContext.purpose !== "spaced-review" && <RecipeSummary context={resultContext} />}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <ResultMetric icon={Keyboard} label="Final accuracy" value={`${Math.round(result.finalTextAccuracy)}%`} sub={`${result.uncorrectedErrors} left uncorrected`} compact />
