@@ -26,12 +26,19 @@ import {
   assessGuidedAttempt,
   finaliseLessonMastery,
   getGuidedExerciseRequirements,
+  getNextRecommendedLesson,
   isAdaptiveLessonUnlocked,
   MASTERY_RULE_VERSION,
   MASTERY_STATES,
 } from "@/lib/adaptiveLearning";
 import { generateGuidedLessonExercise, generatePracticeSession } from "@/data/contentBank";
 import { buildRecoveryConfig } from "@/lib/practiceRecipes";
+import {
+  getInitialLessonExerciseIndex,
+  getLessonStepAccess,
+  getPassedLessonExerciseIndexes,
+} from "@/lib/lessonStepAccess";
+import { getOrCreateLessonSessionSeed, setLessonSessionSeed } from "@/lib/lessonSessionState";
 import { buildSessionComparison, getLessonMasteryBlockers, summariseMasteryBlockers } from "@/lib/resultCoaching";
 import { cn } from "@/lib/utils";
 
@@ -42,21 +49,6 @@ const practiceModes = [
 ];
 const EMPTY_MASTERY = Object.freeze({});
 
-function getPassedExerciseIndexes(lesson, mastery = {}, completed = false) {
-  if (!lesson) return [];
-  const source = completed ? mastery.reviewExerciseResults : mastery.exerciseResults;
-  return lesson.exercises
-    .map((item, index) => source?.[item.id]?.passed ? index : null)
-    .filter((index) => index !== null);
-}
-
-function getNextExerciseIndex(lesson, passedIndexes = []) {
-  if (!lesson) return 0;
-  return lesson.exercises.findIndex((_, index) => !passedIndexes.includes(index)) >= 0
-    ? lesson.exercises.findIndex((_, index) => !passedIndexes.includes(index))
-    : 0;
-}
-
 export function LessonPage() {
   const { lessonId } = useParams();
   return <LessonPageContent key={lessonId} lessonId={lessonId} />;
@@ -65,30 +57,47 @@ export function LessonPage() {
 function LessonPageContent({ lessonId }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { data, recordSession, completeLesson } = useApp();
+  const { data, recordSession, completeLesson, workspaceId = "guest" } = useApp();
   const lesson = getLessonById(lessonId);
   const nextLesson = lesson ? getNextLesson(lesson.id) : null;
   const unlocked = lesson ? isAdaptiveLessonUnlocked(lesson.id, data) : false;
-  const alreadyComplete = lesson ? data.progress.completedLessons.includes(lesson.id) : false;
   const currentMastery = useMemo(
     () => lesson ? data.progress.lessonMastery[lesson.id] ?? EMPTY_MASTERY : EMPTY_MASTERY,
     [data.progress.lessonMastery, lesson],
   );
-  // A completed lesson can still be revisited for practice, but it no longer counts
-  // as spaced-review evidence. Dedicated retention checks live under /review/:lessonId.
+  const alreadyComplete = lesson ? data.progress.completedLessons.includes(lesson.id) : false;
+  const lessonMastered = Boolean(
+    alreadyComplete
+    || currentMastery.masteredAt
+    || [MASTERY_STATES.MASTERED, MASTERY_STATES.REVIEW_DUE].includes(currentMastery.state),
+  );
+  const coursePositionLesson = getNextRecommendedLesson(data);
+
+  // A mastered lesson can be replayed freely, but replay remains optional practice.
+  // Dedicated retention checks live under /review/:lessonId and are the only path
+  // allowed to move the spaced-review schedule.
   const reviewAttempt = false;
   const restoredSession = location.state?.lessonSession ?? null;
   const remediation = location.state?.remediation ?? null;
 
-  const initialPassedExercises = getPassedExerciseIndexes(lesson, currentMastery, alreadyComplete);
-  const [exerciseIndex, setExerciseIndex] = useState(() => restoredSession
+  const initialPassedExercises = getPassedLessonExerciseIndexes(lesson, currentMastery);
+  const initialStepAccess = getLessonStepAccess(lesson, initialPassedExercises, { mastered: lessonMastered });
+  const requestedExerciseIndex = restoredSession
     ? Math.min(Math.max(0, Number(restoredSession.exerciseIndex) || 0), Math.max(0, (lesson?.exercises.length ?? 1) - 1))
-    : getNextExerciseIndex(lesson, initialPassedExercises));
+    : null;
+  const initialExerciseIndex = requestedExerciseIndex !== null && initialStepAccess[requestedExerciseIndex]?.unlocked
+    ? requestedExerciseIndex
+    : getInitialLessonExerciseIndex(lesson, initialPassedExercises, { mastered: lessonMastered });
+  const [exerciseIndex, setExerciseIndex] = useState(initialExerciseIndex);
   const [passedExercises, setPassedExercises] = useState(initialPassedExercises);
   const [practiceMode, setPracticeMode] = useState(restoredSession?.practiceMode ?? "guided");
   const [wordCount, setWordCount] = useState(restoredSession?.wordCount ?? 100);
   const [durationSeconds, setDurationSeconds] = useState(restoredSession?.durationSeconds ?? 180);
-  const [seed, setSeed] = useState(Date.now());
+  const [seed, setSeed] = useState(() => {
+    const initialExercise = lesson?.exercises?.[initialExerciseIndex];
+    if (!lesson || !initialExercise) return Date.now();
+    return getOrCreateLessonSessionSeed({ workspaceId, lessonId: lesson.id, exerciseId: initialExercise.id });
+  });
   const [lessonFinished, setLessonFinished] = useState(null);
   const [lastResult, setLastResult] = useState(null);
   const [comparison, setComparison] = useState(null);
@@ -97,6 +106,26 @@ function LessonPageContent({ lessonId }) {
   const masterySummary = summariseMasteryBlockers(masteryBlockers);
   const exercise = lesson?.exercises[exerciseIndex];
   const guidedRequirements = lesson && exercise ? getGuidedExerciseRequirements(lesson, exercise) : null;
+
+  const getStoredSeedForExercise = useCallback((index) => {
+    const targetExercise = lesson?.exercises?.[index];
+    if (!lesson || !targetExercise) return Date.now();
+    return getOrCreateLessonSessionSeed({
+      workspaceId,
+      lessonId: lesson.id,
+      exerciseId: targetExercise.id,
+    });
+  }, [lesson, workspaceId]);
+
+  const createFreshSeedForExercise = useCallback((index) => {
+    const targetExercise = lesson?.exercises?.[index];
+    if (!lesson || !targetExercise) return Date.now();
+    return setLessonSessionSeed({
+      workspaceId,
+      lessonId: lesson.id,
+      exerciseId: targetExercise.id,
+    }, Date.now() + 104729 + index);
+  }, [lesson, workspaceId]);
 
   const generatedSession = useMemo(() => {
     if (!lesson || !exercise) return { text: "", metadata: {} };
@@ -143,8 +172,8 @@ function LessonPageContent({ lessonId }) {
   const generateFreshGuidedText = useCallback(() => {
     setLastResult(null);
     setComparison(null);
-    setSeed((current) => current + 104729);
-  }, []);
+    setSeed(createFreshSeedForExercise(exerciseIndex));
+  }, [createFreshSeedForExercise, exerciseIndex]);
 
   const handleComplete = useCallback((result) => {
     if (!lesson || !exercise) return;
@@ -156,6 +185,9 @@ function LessonPageContent({ lessonId }) {
       ? assessGuidedAttempt(enrichedResult, lesson, exercise, { previousMastery: currentMastery }).passed
       : valid && resultAccuracy >= accuracyTarget && (practiceMode === "timed" || Number(result.completion) >= 99.9);
     setLastResult(result);
+    if (practiceMode === "guided" && sessionPassed) {
+      setPassedExercises((current) => current.includes(exerciseIndex) ? current : [...current, exerciseIndex].sort((a, b) => a - b));
+    }
     const comparisonMeta = {
       type: practiceMode === "guided" ? "lesson" : "lesson-practice",
       lessonId: lesson.id,
@@ -188,7 +220,7 @@ function LessonPageContent({ lessonId }) {
       remediationSourceId: remediation?.sourceId,
       remediationFreshText: remediation?.stage === "reassessment" ? true : undefined,
     });
-  }, [currentMastery, data.attempts, durationSeconds, exercise, generatedSession.metadata, guidedRequirements, lesson, practiceMode, recordSession, remediation, reviewAttempt, withGuidedEvidence, wordCount]);
+  }, [currentMastery, data.attempts, durationSeconds, exercise, exerciseIndex, generatedSession.metadata, guidedRequirements, lesson, practiceMode, recordSession, remediation, reviewAttempt, withGuidedEvidence, wordCount]);
 
   const handleContinue = useCallback(() => {
     if (!lesson || !exercise) return;
@@ -200,13 +232,24 @@ function LessonPageContent({ lessonId }) {
       return;
     }
 
-    setPassedExercises((current) => current.includes(exerciseIndex) ? current : [...current, exerciseIndex]);
+    setPassedExercises((current) => current.includes(exerciseIndex)
+      ? current
+      : [...current, exerciseIndex].sort((a, b) => a - b));
 
     if (exerciseIndex < lesson.exercises.length - 1) {
-      setExerciseIndex((current) => current + 1);
+      const nextIndex = exerciseIndex + 1;
+      setExerciseIndex(nextIndex);
       setLastResult(null);
       setComparison(null);
-      setSeed(Date.now());
+      setSeed(getStoredSeedForExercise(nextIndex));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // A mastered lesson replay is voluntary practice only. It must never move
+    // course position or touch the dedicated spaced-review schedule.
+    if (lessonMastered) {
+      setLessonFinished("revisited");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -216,7 +259,7 @@ function LessonPageContent({ lessonId }) {
     completeLesson(lesson.id);
     setLessonFinished(mastered ? "mastered" : "practice-more");
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [completeLesson, data.progress.lessonMastery, exercise, exerciseIndex, lesson, practiceMode]);
+  }, [completeLesson, data.progress.lessonMastery, exercise, exerciseIndex, getStoredSeedForExercise, lesson, lessonMastered, practiceMode]);
 
   const practiseMistakes = useCallback(() => {
     if (!lastResult) return;
@@ -257,44 +300,51 @@ function LessonPageContent({ lessonId }) {
 
   if (lessonFinished) {
     const mastered = lessonFinished === "mastered";
+    const revisited = lessonFinished === "revisited";
     return (
       <section className="mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_-36px_rgba(15,23,42,0.35)] dark:border-slate-800 dark:bg-slate-900">
         <div className={cn(
           "relative isolate overflow-hidden px-6 py-8 text-center sm:px-10 sm:py-10",
           mastered
             ? "bg-gradient-to-b from-emerald-50/90 to-white dark:from-emerald-500/10 dark:to-slate-900"
-            : "bg-gradient-to-b from-amber-50/90 to-white dark:from-amber-500/10 dark:to-slate-900",
+            : revisited
+              ? "bg-gradient-to-b from-violet-50/90 to-white dark:from-violet-500/10 dark:to-slate-900"
+              : "bg-gradient-to-b from-amber-50/90 to-white dark:from-amber-500/10 dark:to-slate-900",
         )}>
           <div className={cn(
             "pointer-events-none absolute left-1/2 top-0 -z-10 h-56 w-96 -translate-x-1/2 rounded-full blur-3xl",
-            mastered ? "bg-emerald-100/70 dark:bg-emerald-500/10" : "bg-amber-100/70 dark:bg-amber-500/10",
+            mastered ? "bg-emerald-100/70 dark:bg-emerald-500/10" : revisited ? "bg-violet-100/70 dark:bg-violet-500/10" : "bg-amber-100/70 dark:bg-amber-500/10",
           )} />
           <span className={cn(
             "mx-auto grid size-16 place-items-center rounded-[1.35rem] border shadow-sm",
             mastered
               ? "border-emerald-200 bg-white text-emerald-600 dark:border-emerald-500/25 dark:bg-slate-900 dark:text-emerald-300"
-              : "border-amber-200 bg-white text-amber-600 dark:border-amber-500/25 dark:bg-slate-900 dark:text-amber-300",
+              : revisited
+                ? "border-violet-200 bg-white text-violet-600 dark:border-violet-500/25 dark:bg-slate-900 dark:text-violet-300"
+                : "border-amber-200 bg-white text-amber-600 dark:border-amber-500/25 dark:bg-slate-900 dark:text-amber-300",
           )}>
-            {mastered ? <Trophy className="size-8" /> : <RefreshCcw className="size-7" />}
+            {mastered ? <Trophy className="size-8" /> : revisited ? <Repeat2 className="size-7" /> : <RefreshCcw className="size-7" />}
           </span>
           <p className={cn(
             "mt-5 text-xs font-semibold uppercase tracking-[0.16em]",
-            mastered ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300",
+            mastered ? "text-emerald-700 dark:text-emerald-300" : revisited ? "text-violet-700 dark:text-violet-300" : "text-amber-700 dark:text-amber-300",
           )}>
-            {mastered ? `Lesson ${lesson.number} mastered` : "Almost there"}
+            {mastered ? `Lesson ${lesson.number} mastered` : revisited ? "Practice revisit complete" : "Almost there"}
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-4xl dark:text-white">{lesson.title}</h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base dark:text-slate-300">
             {mastered
               ? "You completed every guided step with the required control. Your progress is saved and the course can move forward."
-              : masterySummary.next?.detail || "Your work is saved, but one mastery requirement still needs a clean pass."}
+              : revisited
+                ? "Optional replay complete. This lesson stays mastered; your course position and spaced-review schedule were not changed."
+                : masterySummary.next?.detail || "Your work is saved, but one mastery requirement still needs a clean pass."}
           </p>
 
           <div className="mx-auto mt-7 grid max-w-2xl gap-2 sm:grid-cols-3" aria-label="Lesson exercise completion">
             {lesson.exercises.map((item, index) => (
               <div key={item.id} className={cn(
                 "flex min-h-12 items-center gap-2 rounded-2xl border px-3 py-2 text-left text-xs font-semibold",
-                mastered
+                mastered || revisited
                   ? "border-emerald-200/80 bg-white/85 text-emerald-800 dark:border-emerald-500/20 dark:bg-slate-900/80 dark:text-emerald-300"
                   : index < exerciseIndex
                     ? "border-emerald-200/80 bg-white/85 text-emerald-800 dark:border-emerald-500/20 dark:bg-slate-900/80 dark:text-emerald-300"
@@ -302,31 +352,40 @@ function LessonPageContent({ lessonId }) {
               )}>
                 <span className={cn(
                   "grid size-6 shrink-0 place-items-center rounded-lg",
-                  mastered || index < exerciseIndex
+                  mastered || revisited || index < exerciseIndex
                     ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
                     : "bg-slate-100 text-slate-400 dark:bg-slate-800",
                 )}>
-                  {mastered || index < exerciseIndex ? <Check className="size-3.5" /> : index + 1}
+                  {mastered || revisited || index < exerciseIndex ? <Check className="size-3.5" /> : index + 1}
                 </span>
                 <span className="truncate">{item.title}</span>
               </div>
             ))}
           </div>
 
-          {mastered && (
+          {(mastered || revisited) && (
             <div className="mx-auto mt-6 flex max-w-xl items-start gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/75 px-4 py-3 text-left dark:border-indigo-500/20 dark:bg-indigo-500/[0.07]">
               <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-white text-indigo-600 shadow-sm dark:bg-slate-900 dark:text-indigo-300">
                 <RefreshCcw className="size-4" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">Review is handled automatically</p>
-                <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">This lesson will return later as a short spaced review when it is actually due.</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{revisited ? "Course progress stayed untouched" : "Review is handled automatically"}</p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">{revisited ? "Replaying a mastered lesson is practice only. It cannot advance, postpone, or complete a spaced review." : "This lesson will return later as a short spaced review when it is actually due."}</p>
               </div>
             </div>
           )}
 
           <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-            {mastered && nextLesson ? (
+            {revisited ? (
+              <>
+                {coursePositionLesson && coursePositionLesson.id !== lesson.id && (
+                  <Button as={Link} to={`/learn/${coursePositionLesson.id}`} variant="brand" size="lg">
+                    Return to lesson {coursePositionLesson.number}<ArrowRight className="size-4" />
+                  </Button>
+                )}
+                <Button as={Link} to="/learn" variant="secondary" size="lg"><BookOpen className="size-4" />Course map</Button>
+              </>
+            ) : mastered && nextLesson ? (
               <>
                 <Button as={Link} to={`/learn/${nextLesson.id}`} variant="brand" size="lg">
                   Continue to lesson {nextLesson.number}<ArrowRight className="size-4" />
@@ -337,7 +396,7 @@ function LessonPageContent({ lessonId }) {
               </>
             ) : (
               <>
-                <Button variant="brand" size="lg" onClick={() => { setLessonFinished(null); setExerciseIndex(0); setSeed(Date.now()); }}>
+                <Button variant="brand" size="lg" onClick={() => { setLessonFinished(null); setExerciseIndex(0); setSeed(createFreshSeedForExercise(0)); }}>
                   <RefreshCcw className="size-4" />Repeat guided lesson
                 </Button>
                 <Button as={Link} to="/learn" variant="secondary" size="lg"><BookOpen className="size-4" />Course map</Button>
@@ -355,13 +414,21 @@ function LessonPageContent({ lessonId }) {
     setSeed(Date.now());
   };
 
-  const guidedPassedCount = passedExercises.filter((index) => index < lesson.exercises.length).length;
-  const guidedPositionPercent = Math.round(((exerciseIndex + 1) / Math.max(1, lesson.exercises.length)) * 100);
+  const stepAccess = getLessonStepAccess(lesson, passedExercises, { mastered: lessonMastered });
+  const guidedPassedCount = stepAccess.filter((step) => step.completed).length;
+  const guidedPositionPercent = Math.round((guidedPassedCount / Math.max(1, lesson.exercises.length)) * 100);
+
+  const changePracticeMode = (value) => {
+    setPracticeMode(value);
+    setLastResult(null);
+    setComparison(null);
+    setSeed(value === "guided" ? getStoredSeedForExercise(exerciseIndex) : Date.now());
+  };
 
   const modeControl = (
     <SegmentedControl
       value={practiceMode}
-      onChange={(value) => { setPracticeMode(value); resetGeneratedText(); }}
+      onChange={changePracticeMode}
       options={practiceModes}
       label="Lesson practice mode"
       className="w-full rounded-xl p-1 [&>button]:min-h-10 [&>button]:flex-1 [&>button]:rounded-lg [&>button]:px-3 [&>button]:py-1.5"
@@ -420,39 +487,68 @@ function LessonPageContent({ lessonId }) {
 
   const lessonPath = (
     <div className="relative mt-5">
-      <div className="pointer-events-none absolute left-[11%] right-[11%] top-9 hidden h-px bg-slate-200 sm:block dark:bg-slate-800" aria-hidden="true" />
-      <div className="pointer-events-none absolute left-[11%] top-9 hidden h-px bg-gradient-to-r from-emerald-500 via-indigo-500 to-violet-500 sm:block" style={{ width: `${Math.max(0, (exerciseIndex / Math.max(1, lesson.exercises.length - 1)) * 78)}%` }} aria-hidden="true" />
       <div className="relative grid gap-3 sm:grid-cols-3" role="group" aria-label="Guided lesson steps">
         {lesson.exercises.map((item, index) => {
-          const done = passedExercises.includes(index) || index < exerciseIndex;
+          const access = stepAccess[index] ?? { completed: false, unlocked: index === 0 };
+          const done = access.completed;
           const active = index === exerciseIndex;
-          const available = index <= exerciseIndex || passedExercises.includes(index);
+          const available = access.unlocked;
+          const status = active && done
+            ? "Completed · Replaying"
+            : done
+              ? "Completed"
+              : active
+                ? "In progress"
+                : available
+                  ? "Ready"
+                  : "Locked";
+          const connectorActive = done || (available && index < exerciseIndex);
+
           return (
             <button
               key={item.id}
               type="button"
               disabled={!available}
               aria-current={active ? "step" : undefined}
+              aria-label={`${item.title}. ${status}`}
               onClick={() => {
-                if (!available) return;
+                if (!available || index === exerciseIndex) return;
                 setExerciseIndex(index);
-                resetGeneratedText();
+                setLastResult(null);
+                setComparison(null);
+                setSeed(getStoredSeedForExercise(index));
               }}
               className={cn(
                 "relative z-10 flex min-h-[4.6rem] items-center gap-4 rounded-2xl border px-5 py-3.5 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-500/15 disabled:cursor-not-allowed",
-                active && "border-violet-500 bg-violet-50/80 shadow-[0_0_0_1px_rgba(139,92,246,0.18),0_14px_35px_-24px_rgba(124,58,237,0.8)] dark:bg-violet-500/[0.08]",
-                done && !active && "border-emerald-500/35 bg-emerald-50/55 dark:bg-emerald-500/[0.06]",
-                !done && !active && "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/70",
-                !available && "opacity-65",
+                active && "border-violet-500 bg-violet-50 shadow-[0_0_0_1px_rgba(139,92,246,0.18),0_14px_35px_-24px_rgba(124,58,237,0.8)] dark:bg-[#16152a]",
+                done && !active && "border-emerald-500/35 bg-emerald-50 dark:bg-[#0b201d]",
+                available && !done && !active && "border-slate-200 bg-white hover:border-violet-300 hover:bg-violet-50/45 dark:border-slate-800 dark:bg-slate-950/95 dark:hover:border-violet-500/40 dark:hover:bg-violet-500/[0.06]",
+                !available && "border-slate-200 bg-slate-50 opacity-60 dark:border-slate-800 dark:bg-slate-950/70",
               )}
             >
+              {index < lesson.exercises.length - 1 && (
+                <span
+                  className={cn(
+                    "pointer-events-none absolute left-full top-1/2 hidden h-px w-3 -translate-y-1/2 sm:block",
+                    connectorActive ? "bg-emerald-400/70 dark:bg-emerald-500/45" : "bg-slate-200 dark:bg-slate-800",
+                  )}
+                  aria-hidden="true"
+                />
+              )}
               <span className={cn(
                 "grid size-10 shrink-0 place-items-center rounded-full border text-sm font-bold",
                 active && "border-violet-400 bg-violet-600 text-white shadow-[0_0_24px_rgba(124,58,237,0.35)]",
                 done && !active && "border-emerald-400/60 bg-emerald-500 text-white",
-                !done && !active && "border-slate-300 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+                available && !done && !active && "border-slate-300 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
+                !available && "border-slate-300 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-600",
               )}>
-                {done ? <Check className="size-4" aria-hidden="true" /> : index + 1}
+                {active
+                  ? index + 1
+                  : done
+                    ? <Check className="size-4" aria-hidden="true" />
+                    : available
+                      ? index + 1
+                      : <LockKeyhole className="size-3.5" aria-hidden="true" />}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-slate-950 dark:text-white">{item.title}</span>
@@ -460,9 +556,10 @@ function LessonPageContent({ lessonId }) {
                   "mt-1 block text-xs font-medium",
                   active && "text-violet-600 dark:text-violet-300",
                   done && !active && "text-emerald-600 dark:text-emerald-300",
-                  !done && !active && "text-slate-400",
+                  available && !done && !active && "text-slate-500 dark:text-slate-400",
+                  !available && "text-slate-400 dark:text-slate-600",
                 )}>
-                  {done ? "Completed" : active ? "In progress" : "Upcoming"}
+                  {status}
                 </span>
               </span>
             </button>
@@ -481,7 +578,7 @@ function LessonPageContent({ lessonId }) {
               <Link to="/learn" className="text-violet-600 transition hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300">Learn</Link>
               <ChevronRight className="size-3.5 text-slate-400" aria-hidden="true" />
               <span className="text-slate-700 dark:text-slate-200">Lesson {lesson.number}</span>
-              {alreadyComplete && <span className="ml-2 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">Mastered</span>}
+              {lessonMastered && <span className="ml-2 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">Mastered</span>}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <h1 id="lesson-focus-title" className="text-3xl font-semibold tracking-[-0.045em] text-slate-950 dark:text-white">{lesson.title}</h1>
@@ -535,6 +632,7 @@ function LessonPageContent({ lessonId }) {
         caretStyle={data.settings.caretStyle}
         lessonTip={lesson.technique}
         focusKeys={lesson.focusKeys}
+        recoverySessionId={`lesson:${lesson.id}:${practiceMode}:${exercise.id}`}
         onComplete={handleComplete}
         onContinue={handleContinue}
         onResultRetry={practiceMode === "guided" ? generateFreshGuidedText : undefined}

@@ -39,6 +39,7 @@ import {
   clearAccountSyncState,
 } from "@/lib/syncStorage.js";
 import { clearWorkspaceRecovery } from "@/lib/sessionRecovery.js";
+import { clearLessonSessionSeeds } from "@/lib/lessonSessionState.js";
 import {
   clearAttemptDetails,
   compactAttemptSummary,
@@ -753,7 +754,8 @@ export function AppProvider({ children }) {
         if (lesson) {
           const existingMastery = lessonMastery[session.lessonId] ?? {};
           const existingState = getEffectiveMasteryState(existingMastery);
-          const alreadyMastered = Boolean(existingMastery.masteredAt)
+          const alreadyMastered = completedLessons.includes(session.lessonId)
+            || Boolean(existingMastery.masteredAt)
             || [MASTERY_STATES.MASTERED, MASTERY_STATES.REVIEW_DUE].includes(existingState);
 
           // Reopening an old lesson is remediation/repractice, not spaced-review evidence.
@@ -880,6 +882,8 @@ export function AppProvider({ children }) {
   const resetData = useCallback(async () => {
     if (workspaceRef.current.userId) return false;
     clearAppData(null);
+    clearWorkspaceRecovery("guest");
+    clearLessonSessionSeeds("guest");
     await clearAttemptDetails(null);
     setData(createFreshAppData());
     await refreshStorageHealth();
@@ -891,6 +895,7 @@ export function AppProvider({ children }) {
     clearAppData(userId);
     clearAccountSyncState(userId);
     clearWorkspaceRecovery(`user:${userId}`);
+    clearLessonSessionSeeds(`user:${userId}`);
     await clearAttemptDetails(userId);
     if (workspaceRef.current.userId === userId) {
       const guestData = loadAppData(null);

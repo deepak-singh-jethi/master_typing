@@ -16,13 +16,15 @@ function hashText(value = "") {
 }
 
 export function buildRecoveryIdentity({ workspaceId = "guest", target = "", durationSeconds = null, backspaceMode = "allowed", sessionId = "session" } = {}) {
+  const normalisedSessionId = String(sessionId || "session");
   return {
-    key: `${RECOVERY_PREFIX}${workspaceId}`,
+    key: `${RECOVERY_PREFIX}${workspaceId}:${hashText(normalisedSessionId)}`,
+    legacyKey: `${RECOVERY_PREFIX}${workspaceId}`,
     targetHash: hashText(target),
     targetLength: target.length,
     durationSeconds: durationSeconds == null ? null : Number(durationSeconds),
     backspaceMode,
-    sessionId: String(sessionId || "session"),
+    sessionId: normalisedSessionId,
   };
 }
 
@@ -33,7 +35,12 @@ function safeClone(value) {
 export function createRecoverySnapshot({ identity, telemetry, elapsedMs = 0, paceSamples = [], status = "paused", savedAt = new Date().toISOString() } = {}) {
   return {
     version: RECOVERY_VERSION,
-    ...identity,
+    key: identity?.key,
+    targetHash: identity?.targetHash,
+    targetLength: identity?.targetLength,
+    durationSeconds: identity?.durationSeconds ?? null,
+    backspaceMode: identity?.backspaceMode,
+    sessionId: identity?.sessionId,
     status: status === "running" ? "paused" : status,
     telemetry: safeClone(telemetry),
     elapsedMs: Math.max(0, Number(elapsedMs) || 0),
@@ -67,17 +74,33 @@ export function saveRecoverySnapshot(identity, snapshot, storage = defaultStorag
   }
 }
 
+function readSnapshot(key, storage) {
+  if (!key) return null;
+  const raw = storage.getItem(key);
+  if (!raw) return null;
+  return JSON.parse(raw);
+}
+
 export function loadRecoverySnapshot(identity, storage = defaultStorage(), now = Date.now()) {
   if (!storage || !identity?.key) return null;
   try {
-    const raw = storage.getItem(identity.key);
-    if (!raw) return null;
-    const snapshot = JSON.parse(raw);
-    if (!isRecoverySnapshotCompatible(snapshot, identity, now)) {
-      storage.removeItem(identity.key);
-      return null;
+    const snapshot = readSnapshot(identity.key, storage);
+    if (snapshot) {
+      if (!isRecoverySnapshotCompatible(snapshot, identity, now)) {
+        storage.removeItem(identity.key);
+        return null;
+      }
+      return snapshot;
     }
-    return snapshot;
+
+    // Migrate the pre-multi-session recovery slot when it belongs to this exact session.
+    const legacy = identity.legacyKey ? readSnapshot(identity.legacyKey, storage) : null;
+    if (legacy && isRecoverySnapshotCompatible(legacy, identity, now)) {
+      storage.setItem(identity.key, JSON.stringify(legacy));
+      storage.removeItem(identity.legacyKey);
+      return legacy;
+    }
+    return null;
   } catch {
     try { storage.removeItem(identity.key); } catch { /* best effort */ }
     return null;
@@ -87,9 +110,35 @@ export function loadRecoverySnapshot(identity, storage = defaultStorage(), now =
 export function clearRecoverySnapshot(identity, storage = defaultStorage()) {
   if (!storage || !identity?.key) return;
   try { storage.removeItem(identity.key); } catch { /* best effort */ }
+
+  if (!identity.legacyKey) return;
+  try {
+    const legacy = readSnapshot(identity.legacyKey, storage);
+    if (legacy && isRecoverySnapshotCompatible(legacy, identity)) storage.removeItem(identity.legacyKey);
+  } catch {
+    // Legacy cleanup is best effort only.
+  }
 }
 
 export function clearWorkspaceRecovery(workspaceId, storage = defaultStorage()) {
   if (!storage || !workspaceId) return;
-  try { storage.removeItem(`${RECOVERY_PREFIX}${workspaceId}`); } catch { /* best effort */ }
+  const legacyKey = `${RECOVERY_PREFIX}${workspaceId}`;
+  const sessionPrefix = `${legacyKey}:`;
+  try { storage.removeItem(legacyKey); } catch { /* best effort */ }
+
+  if (typeof storage.length === "number" && typeof storage.key === "function") {
+    const keys = [];
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key?.startsWith(sessionPrefix)) keys.push(key);
+    }
+    keys.forEach((key) => {
+      try { storage.removeItem(key); } catch { /* best effort */ }
+    });
+    return;
+  }
+
+  if (typeof storage.dump === "function") {
+    Object.keys(storage.dump()).filter((key) => key.startsWith(sessionPrefix)).forEach((key) => storage.removeItem(key));
+  }
 }

@@ -13,7 +13,9 @@ test("lesson page puts lesson identity and guided progress before the typing sur
   const workspaceIndex = lesson.lastIndexOf('layout="lesson-focus"');
   assert.ok(titleIndex >= 0 && stepsIndex > titleIndex && workspaceIndex > stepsIndex);
   assert.match(lesson, /Step \{exerciseIndex \+ 1\} of \{lesson\.exercises\.length\}/);
-  assert.match(lesson, /done \? "Completed" : active \? "In progress" : "Upcoming"/);
+  assert.match(lesson, /Completed · Replaying/);
+  assert.match(lesson, /"Ready"/);
+  assert.match(lesson, /"Locked"/);
   assert.match(lesson, /Lesson map/);
 });
 

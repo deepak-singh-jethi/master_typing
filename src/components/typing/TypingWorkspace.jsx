@@ -78,6 +78,7 @@ export function TypingWorkspace({
   layout = "standard",
   lessonTip = "",
   focusKeys = [],
+  recoverySessionId = null,
 }) {
   const { workspaceId = "guest" } = useApp();
   const inputRef = useRef(null);
@@ -100,8 +101,8 @@ export function TypingWorkspace({
     target,
     durationSeconds,
     backspaceMode,
-    sessionId: `${sessionLabel}:${title}`,
-  }), [backspaceMode, durationSeconds, sessionLabel, target, title, workspaceId]);
+    sessionId: recoverySessionId || `${sessionLabel}:${title}`,
+  }), [backspaceMode, durationSeconds, recoverySessionId, sessionLabel, target, title, workspaceId]);
 
   const session = useTypingSession({
     target,
