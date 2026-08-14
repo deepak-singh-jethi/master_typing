@@ -169,6 +169,22 @@ function normaliseItem(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function getLessonRemediationAllowedCharacters(recipe = {}) {
+  if (recipe.remediationSourceType !== "lesson") return null;
+  const sourceLesson = getLessonById(recipe.remediationSourceId);
+  if (sourceLesson?.allowedCharacters) return sourceLesson.allowedCharacters;
+  const allowedCharacters = typeof recipe.remediationAllowedCharacters === "string"
+    ? recipe.remediationAllowedCharacters
+    : "";
+  return allowedCharacters || null;
+}
+
+function usesOnlyAllowedCharacters(value, allowedCharacters) {
+  if (!allowedCharacters) return true;
+  const allowed = new Set([...allowedCharacters]);
+  return [...String(value ?? "")].every((character) => allowed.has(character));
+}
+
 function hashText(value) {
   let hash = 2166136261;
   const text = String(value || "");
@@ -268,15 +284,21 @@ function weightedPick(candidates, random, previous = "") {
 function buildRecipeWords(pool, count, recipe, seed) {
   const random = seededRandom(seed);
   const recent = new Set((recipe.recentExclusions?.items ?? []).map(normaliseItem));
+  const lessonBoundary = getLessonRemediationAllowedCharacters(recipe);
   const recoveryWords = unique((recipe.recoveryWords ?? [])
     .map(normaliseItem)
-    .filter((word) => /^[a-z'-]{2,30}$/i.test(word)));
+    .filter((word) => /^[a-z'-]{2,30}$/i.test(word))
+    .filter((word) => usesOnlyAllowedCharacters(word, lessonBoundary)));
   const supplementalFocusWords = ["adaptive", "recovery"].includes(recipe.purpose)
-    ? commonWords.filter((word) => focusScore(word, recipe) > 0)
+    ? commonWords.filter((word) => (
+        usesOnlyAllowedCharacters(word, lessonBoundary)
+        && focusScore(word, recipe) > 0
+      ))
     : [];
   const cleanPool = unique([...pool, ...supplementalFocusWords, ...recoveryWords]
     .map((word) => String(word).trim().toLowerCase())
-    .filter(Boolean));
+    .filter(Boolean)
+    .filter((word) => usesOnlyAllowedCharacters(word, lessonBoundary)));
   const preferredPool = cleanPool.filter((word) => !recent.has(normaliseItem(word)));
   const sourcePool = preferredPool.length >= Math.min(40, cleanPool.length / 3) ? preferredPool : cleanPool;
   const difficultyTarget = recipe.difficultyTarget ?? resolveDifficultyBand(recipe.difficulty, recipe.skillStage);
@@ -302,6 +324,20 @@ function buildRecipeWords(pool, count, recipe, seed) {
   const desiredFocused = Math.min(count, Math.round(count * (Number(recipe.targetDensity) || 0)));
   let focusedCount = 0;
   let previous = "";
+  const lesson = lessonBoundary ? getLessonById(recipe.remediationSourceId) : null;
+  const fallbackCandidates = unique([
+    ...recoveryWords,
+    ...(lesson?.practiceTokens ?? []),
+    ...(recipe.focusBigrams ?? []),
+    ...(recipe.focusKeys ?? []),
+  ]
+    .map((item) => String(item ?? "").trim().toLowerCase())
+    .filter(Boolean)
+    .filter((item) => usesOnlyAllowedCharacters(item, lessonBoundary)));
+  const firstAllowedCharacter = lessonBoundary
+    ? [...lessonBoundary].find((character) => character !== " ") ?? ""
+    : "";
+  const safeFallback = fallbackCandidates[0] || firstAllowedCharacter || "practice";
 
   const chooseUnused = (basePool) => {
     const unused = basePool.filter((item) => !used.has(item.value));
@@ -325,7 +361,7 @@ function buildRecipeWords(pool, count, recipe, seed) {
       word = chooseUnused(neutral.length ? neutral : candidates);
     }
 
-    if (!word) word = "practice";
+    if (!word) word = safeFallback;
     if (word === previous && candidates.length > 1) {
       const alternatives = candidates.filter((item) => item.value !== previous);
       word = weightedPick(alternatives, random, previous) || word;
@@ -502,6 +538,32 @@ function getCompatibleLessonWords(lesson) {
   const result = unique(words);
   compatibleLessonWordCache.set(lesson.id, result);
   return result;
+}
+
+function getLessonRecoveryWordPool(recipe, category = "general") {
+  const allowedCharacters = getLessonRemediationAllowedCharacters(recipe);
+  if (!allowedCharacters) return getCategoryPool(category);
+
+  const lesson = getLessonById(recipe.remediationSourceId);
+  const isAllowed = (value) => (
+    Boolean(String(value ?? "").trim())
+    && usesOnlyAllowedCharacters(String(value).toLowerCase(), allowedCharacters)
+  );
+  const recoveryWords = (recipe.recoveryWords ?? []).filter(isAllowed);
+  const lessonTokens = (lesson?.practiceTokens ?? []).filter(isAllowed);
+  const compatibleWords = lesson ? getCompatibleLessonWords(lesson).filter(isAllowed) : [];
+  const categoryWords = getCategoryPool(category).filter(isAllowed);
+  const safeCommonWords = commonWords.filter(isAllowed);
+
+  // Recovery evidence comes first, then vocabulary deliberately authored for the
+  // source lesson. Generic word-bank items are only a safe transfer fallback.
+  return unique([
+    ...recoveryWords,
+    ...lessonTokens,
+    ...compatibleWords,
+    ...categoryWords,
+    ...safeCommonWords,
+  ]);
 }
 
 function getGuidedCandidateTokens(lesson, exercise = null) {
@@ -917,8 +979,14 @@ function generatePracticeSessionOnce(recipe, seed) {
   const recentItems = recipe.recentExclusions?.items ?? [];
   let text = "";
   let items = [];
+  const lessonRemediationBoundary = getLessonRemediationAllowedCharacters(recipe);
 
-  if (recipe.contentType === "custom") {
+  if (lessonRemediationBoundary) {
+    const pool = getLessonRecoveryWordPool(recipe, category);
+    const words = buildRecipeWords(pool, targetWords, recipe, seed);
+    text = words.join(" ");
+    items = words;
+  } else if (recipe.contentType === "custom") {
     const customText = (recipe.customText || "").trim();
     if (!customText) return { text: "", metadata: buildMetadata("", [], recipe) };
     if (recipe.goalType === "time") {
@@ -1011,6 +1079,15 @@ function generatePracticeSessionOnce(recipe, seed) {
     const random = seededRandom(seed + 19);
     text = words.map((word, index) => decorateWord(word, index, recipe, random)).join(" ");
     items = words;
+  }
+
+  if (lessonRemediationBoundary && !usesOnlyAllowedCharacters(text, lessonRemediationBoundary)) {
+    // Defense in depth: a lesson-origin remediation session must never escape the
+    // source lesson's keyboard boundary, even if a future content path changes.
+    const safePool = getLessonRecoveryWordPool(recipe, category);
+    const safeWords = buildRecipeWords(safePool, targetWords, recipe, seed + 7919);
+    text = safeWords.join(" ");
+    items = safeWords;
   }
 
   return {

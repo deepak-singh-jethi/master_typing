@@ -20,6 +20,23 @@ test("dashboard prioritises setup, reviews, lessons, then benchmarks", () => {
   assert.equal(getPrimaryDashboardAction({ onboardingCompleted: true }).kind, "benchmark");
 });
 
+test("dashboard makes a due review explicit without hiding the learner's current lesson", () => {
+  const action = getPrimaryDashboardAction({
+    onboardingCompleted: true,
+    reviewQueue: [{ lessonId: "home-f-j", lesson: { title: "F and J anchors" } }],
+    nextLesson: { id: "top-r-u", number: 8, title: "R and U" },
+  });
+
+  assert.equal(action.kind, "review");
+  assert.equal(action.eyebrow, "Spaced review due");
+  assert.equal(action.title, "Review: F and J anchors");
+  assert.match(action.description, /course position is still Lesson 8: R and U/);
+  assert.deepEqual(action.secondaryAction, {
+    label: "Continue R and U",
+    to: "/learn/top-r-u",
+  });
+});
+
 test("daily goal labels stay simple and action-oriented", () => {
   assert.equal(getPlanCompletionLabel({ completedMinutes: 4, goalMinutes: 10 }), "6 minutes remaining");
   assert.equal(getPlanCompletionLabel({ completedMinutes: 12, goalMinutes: 10 }), "Daily goal complete");

@@ -36,13 +36,24 @@ export function getPrimaryDashboardAction({ onboardingCompleted, reviewQueue = [
 
   if (reviewQueue.length > 0) {
     const review = reviewQueue[0];
+    const currentLessonLabel = nextLesson
+      ? `Lesson ${nextLesson.number}: ${nextLesson.title}`
+      : null;
     return {
       kind: "review",
-      eyebrow: "Review due",
-      title: review.lesson?.title || "Review an earlier lesson",
-      description: "A short spaced review will protect movement you already learned.",
+      eyebrow: "Spaced review due",
+      title: `Review: ${review.lesson?.title || "Earlier lesson"}`,
+      description: currentLessonLabel
+        ? `This earlier lesson is due for a short spaced review. Your course position is still ${currentLessonLabel}.`
+        : "This earlier lesson is due for a short spaced review to protect movement you already learned.",
       label: "Start review",
       to: `/learn/${review.lessonId}`,
+      secondaryAction: nextLesson
+        ? {
+            label: `Continue ${nextLesson.title}`,
+            to: `/learn/${nextLesson.id}`,
+          }
+        : null,
     };
   }
 

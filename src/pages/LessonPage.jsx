@@ -227,6 +227,7 @@ function LessonPageContent({ lessonId }) {
           ...buildRecoveryConfig(lastResult, { category: "general" }, {
             sourceType: "lesson",
             sourceId: lesson.id,
+            allowedCharacters: lesson.allowedCharacters,
             returnTarget: {
               kind: "lesson",
               to: `/learn/${lesson.id}`,

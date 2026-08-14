@@ -48,12 +48,19 @@ export function DashboardPage() {
       <Card as="section" aria-labelledby="next-action-title" className="overflow-hidden border-indigo-200 dark:border-indigo-500/30">
         <div className="grid lg:grid-cols-[1fr_280px]">
           <div className="p-7 sm:p-9">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">Recommended next</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">{primaryAction.eyebrow}</p>
             <h2 id="next-action-title" className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{primaryAction.title}</h2>
             <p className="mt-3 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">{primaryAction.description}</p>
-            <Button as={Link} to={primaryAction.to} variant="brand" size="lg" className="mt-7">
-              <Play className="size-4" aria-hidden="true" />{primaryAction.label}
-            </Button>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Button as={Link} to={primaryAction.to} variant="brand" size="lg">
+                <Play className="size-4" aria-hidden="true" />{primaryAction.label}
+              </Button>
+              {primaryAction.secondaryAction && (
+                <Button as={Link} to={primaryAction.secondaryAction.to} variant="secondary" size="lg">
+                  {primaryAction.secondaryAction.label}<ArrowRight className="size-4" aria-hidden="true" />
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="border-t border-slate-200 bg-slate-50/80 p-7 lg:border-l lg:border-t-0 dark:border-slate-800 dark:bg-slate-950/40">

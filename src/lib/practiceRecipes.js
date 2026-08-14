@@ -1,4 +1,5 @@
 import { resolveDifficultyBand, resolveFeatureProgression } from "./motorDifficulty.js";
+import { getLessonById } from "../data/curriculum.js";
 
 export const REMEDIATION_VERSION = 1;
 
@@ -120,6 +121,59 @@ function normaliseBigram(value) {
   return clean.length === 2 ? clean : "";
 }
 
+function normaliseRemediationAllowedCharacters(value) {
+  if (typeof value !== "string") return null;
+  const clean = [...value]
+    .filter((character) => character === " " || !/[\u0000-\u001F\u007F]/u.test(character))
+    .join("")
+    .slice(0, 160);
+  return clean || null;
+}
+
+function isRecoverySequenceAllowed(value, allowedCharacters) {
+  if (!allowedCharacters) return true;
+  const allowed = new Set([...allowedCharacters]);
+  return [...String(value ?? "")].every((character) => allowed.has(character));
+}
+
+function sanitiseLessonRecoveryTargets({
+  focusKeys = [],
+  focusBigrams = [],
+  recoveryWords = [],
+  confusionPairs = [],
+}, allowedCharacters) {
+  if (!allowedCharacters) {
+    return { focusKeys, focusBigrams, recoveryWords, confusionPairs };
+  }
+
+  const safeFocusKeys = focusKeys.filter((key) => isRecoverySequenceAllowed(key, allowedCharacters));
+  const safeFocusBigrams = focusBigrams.filter((bigram) => isRecoverySequenceAllowed(bigram, allowedCharacters));
+  const safeRecoveryWords = recoveryWords.filter((word) => isRecoverySequenceAllowed(word, allowedCharacters));
+  const safeConfusionPairs = [];
+  const expectedOnlyKeys = [];
+
+  for (const pair of confusionPairs) {
+    const expectedAllowed = isRecoverySequenceAllowed(pair.expected, allowedCharacters);
+    const actualAllowed = isRecoverySequenceAllowed(pair.actual, allowedCharacters);
+    if (!expectedAllowed) continue;
+    if (actualAllowed) {
+      safeConfusionPairs.push(pair);
+    } else {
+      // Keep the expected (learned) key trainable without asking the learner to type
+      // the locked key that was pressed by mistake. The raw result still retains that
+      // diagnostic confusion for analytics.
+      expectedOnlyKeys.push(pair.expected);
+    }
+  }
+
+  return {
+    focusKeys: uniqueStrings([...safeFocusKeys, ...expectedOnlyKeys]),
+    focusBigrams: safeFocusBigrams,
+    recoveryWords: safeRecoveryWords,
+    confusionPairs: safeConfusionPairs,
+  };
+}
+
 function getPresetPurpose(config = {}) {
   if (config.purpose && VALID_PURPOSES.has(config.purpose)) return config.purpose;
   if (config.contentType === "smart" || config.presetId === "smart") return "adaptive";
@@ -138,6 +192,35 @@ export function normalisePracticeConfig(config = {}) {
     : VALID_CONTENT_TYPES.has(config.contentType)
       ? config.contentType
       : "words";
+  const remediationSourceType = ["practice", "test", "lesson"].includes(config.remediationSourceType)
+    ? config.remediationSourceType
+    : null;
+  const remediationSourceId = String(config.remediationSourceId || "").slice(0, 120) || null;
+  const sourceLesson = remediationSourceType === "lesson" && remediationSourceId
+    ? getLessonById(remediationSourceId)
+    : null;
+  const remediationAllowedCharacters = remediationSourceType === "lesson"
+    ? sourceLesson?.allowedCharacters
+      ?? normaliseRemediationAllowedCharacters(config.remediationAllowedCharacters)
+    : null;
+
+  const normalisedTargets = sanitiseLessonRecoveryTargets({
+    focusKeys: uniqueStrings(config.focusKeys?.map(normaliseKey).filter(Boolean)),
+    focusBigrams: uniqueStrings(config.focusBigrams?.map(normaliseBigram).filter((item) => item.length === 2)),
+    recoveryWords: uniqueStrings(config.recoveryWords, { lower: true })
+      .filter((word) => /^[a-z'-]{2,30}$/i.test(word))
+      .slice(0, 20),
+    confusionPairs: Array.isArray(config.confusionPairs)
+      ? config.confusionPairs
+          .map((item) => ({
+            expected: normaliseKey(item?.expected),
+            actual: normaliseKey(item?.actual),
+            count: Math.max(1, Number(item?.count) || 1),
+          }))
+          .filter((item) => item.expected && item.actual)
+          .slice(0, 12)
+      : [],
+  }, remediationAllowedCharacters);
 
   return {
     ...config,
@@ -159,21 +242,10 @@ export function normalisePracticeConfig(config = {}) {
       0.05,
       0.75,
     ),
-    focusKeys: uniqueStrings(config.focusKeys?.map(normaliseKey).filter(Boolean)),
-    focusBigrams: uniqueStrings(config.focusBigrams?.map(normaliseBigram).filter((item) => item.length === 2)),
-    recoveryWords: uniqueStrings(config.recoveryWords, { lower: true })
-      .filter((word) => /^[a-z'-]{2,30}$/i.test(word))
-      .slice(0, 20),
-    confusionPairs: Array.isArray(config.confusionPairs)
-      ? config.confusionPairs
-          .map((item) => ({
-            expected: normaliseKey(item?.expected),
-            actual: normaliseKey(item?.actual),
-            count: Math.max(1, Number(item?.count) || 1),
-          }))
-          .filter((item) => item.expected && item.actual)
-          .slice(0, 12)
-      : [],
+    focusKeys: normalisedTargets.focusKeys,
+    focusBigrams: normalisedTargets.focusBigrams,
+    recoveryWords: normalisedTargets.recoveryWords,
+    confusionPairs: normalisedTargets.confusionPairs,
     remediationVersion: Number(config.remediationVersion) === REMEDIATION_VERSION
       ? REMEDIATION_VERSION
       : null,
@@ -181,10 +253,9 @@ export function normalisePracticeConfig(config = {}) {
     remediationStage: ["recovery", "reassessment"].includes(config.remediationStage)
       ? config.remediationStage
       : null,
-    remediationSourceType: ["practice", "test", "lesson"].includes(config.remediationSourceType)
-      ? config.remediationSourceType
-      : null,
-    remediationSourceId: String(config.remediationSourceId || "").slice(0, 120) || null,
+    remediationSourceType,
+    remediationSourceId,
+    remediationAllowedCharacters,
     remediationReturn: normaliseRemediationReturn(config.remediationReturn),
   };
 }
@@ -294,10 +365,24 @@ function densityLabel(value) {
 
 export function buildPracticeRecipe(config = {}, data = {}) {
   const normalised = normalisePracticeConfig(config);
-  const keyTargets = getAdaptiveKeyTargets(data.statistics?.keyStats, 8);
-  const bigramTargets = getAdaptiveBigramTargets(data.statistics?.bigramStats, 8);
-  const confusionTargets = getConfusionTargets(data.statistics?.keyStats, 6);
-  const recoveryTargets = getRecoveryWordTargets(data.statistics?.wordStats, 10);
+  const lessonBoundary = normalised.remediationSourceType === "lesson"
+    ? normalised.remediationAllowedCharacters
+    : null;
+  const rawKeyTargets = getAdaptiveKeyTargets(data.statistics?.keyStats, 8);
+  const rawBigramTargets = getAdaptiveBigramTargets(data.statistics?.bigramStats, 8);
+  const rawConfusionTargets = getConfusionTargets(data.statistics?.keyStats, 12);
+  const rawRecoveryTargets = getRecoveryWordTargets(data.statistics?.wordStats, 10);
+  const keyTargets = rawKeyTargets.filter((item) => isRecoverySequenceAllowed(item.key, lessonBoundary));
+  const bigramTargets = rawBigramTargets.filter((item) => isRecoverySequenceAllowed(item.key, lessonBoundary));
+  const confusionTargets = rawConfusionTargets
+    .filter((item) => isRecoverySequenceAllowed(item.expected, lessonBoundary)
+      && isRecoverySequenceAllowed(item.actual, lessonBoundary))
+    .slice(0, 6);
+  const expectedOnlyConfusionKeys = uniqueStrings(rawConfusionTargets
+    .filter((item) => isRecoverySequenceAllowed(item.expected, lessonBoundary)
+      && !isRecoverySequenceAllowed(item.actual, lessonBoundary))
+    .map((item) => item.expected));
+  const recoveryTargets = rawRecoveryTargets.filter((item) => isRecoverySequenceAllowed(item.word, lessonBoundary));
 
   const explicitFocus = normalised.focusKeys.length
     || normalised.focusBigrams.length
@@ -308,7 +393,10 @@ export function buildPracticeRecipe(config = {}, data = {}) {
   const focusKeys = normalised.focusKeys.length
     ? normalised.focusKeys
     : shouldAdapt
-      ? keyTargets.slice(0, 5).map((item) => item.key)
+      ? uniqueStrings([
+          ...expectedOnlyConfusionKeys,
+          ...keyTargets.slice(0, 5).map((item) => item.key),
+        ]).slice(0, 5)
       : [];
   const focusBigrams = normalised.focusBigrams.length
     ? normalised.focusBigrams
@@ -416,6 +504,10 @@ export function buildRecoveryConfig(result = {}, previousConfig = {}, context = 
   const chainId = previousConfig.remediationChainId
     || String(context.chainId || "").slice(0, 100)
     || createRemediationId();
+  const remediationSourceType = context.sourceType || previousConfig.remediationSourceType || "practice";
+  const remediationAllowedCharacters = remediationSourceType === "lesson"
+    ? context.allowedCharacters ?? previousConfig.remediationAllowedCharacters ?? null
+    : null;
 
   return normalisePracticeConfig({
     ...previousConfig,
@@ -434,8 +526,9 @@ export function buildRecoveryConfig(result = {}, previousConfig = {}, context = 
     remediationVersion: REMEDIATION_VERSION,
     remediationChainId: chainId,
     remediationStage: "recovery",
-    remediationSourceType: context.sourceType || previousConfig.remediationSourceType || "practice",
+    remediationSourceType,
     remediationSourceId: context.sourceId || previousConfig.remediationSourceId || null,
+    remediationAllowedCharacters,
     remediationReturn: reassessmentTarget,
   });
 }
