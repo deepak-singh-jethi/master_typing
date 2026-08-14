@@ -6,7 +6,7 @@ import {
   getReviewQueue,
   MASTERY_STATES,
 } from "../lib/adaptiveLearning.js";
-import { getPrimaryDashboardAction } from "../lib/uiExperience.js";
+import { getDashboardReviewAction, getPrimaryDashboardAction } from "../lib/uiExperience.js";
 import {
   createFreshAppData,
   loadAppData,
@@ -252,12 +252,15 @@ test("if another different lesson is due, Today may show that next review but ne
   const queue = getReviewQueue(data, new Date("2026-08-14T10:01:00.000Z"));
   assert.deepEqual(queue.map((item) => item.lessonId), ["home-d-k"]);
 
-  const action = getPrimaryDashboardAction({
+  const lessonAction = getPrimaryDashboardAction({
     onboardingCompleted: true,
-    reviewQueue: queue,
     nextLesson: getNextRecommendedLesson(data),
   });
-  assert.equal(action.kind, "review");
-  assert.equal(action.to, "/review/home-d-k");
-  assert.notEqual(action.to, "/review/home-f-j");
+  const reviewAction = getDashboardReviewAction(queue);
+
+  assert.equal(lessonAction.kind, "lesson");
+  assert.equal(lessonAction.to, "/learn/top-r-u");
+  assert.equal(reviewAction.kind, "review");
+  assert.equal(reviewAction.to, "/review/home-d-k");
+  assert.notEqual(reviewAction.to, "/review/home-f-j");
 });
