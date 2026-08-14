@@ -124,7 +124,10 @@ function normaliseBigram(value) {
 function normaliseRemediationAllowedCharacters(value) {
   if (typeof value !== "string") return null;
   const clean = [...value]
-    .filter((character) => character === " " || !/[\u0000-\u001F\u007F]/u.test(character))
+    .filter((character) => {
+      const codePoint = character.codePointAt(0);
+      return codePoint >= 0x20 && codePoint !== 0x7f;
+    })
     .join("")
     .slice(0, 160);
   return clean || null;
