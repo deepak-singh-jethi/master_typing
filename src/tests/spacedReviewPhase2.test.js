@@ -110,7 +110,7 @@ test("review seed is stable inside one due cycle and changes for a later review 
   assert.notDeepEqual(firstPlan.stages.map((stage) => stage.fingerprint), laterPlan.stages.map((stage) => stage.fingerprint));
 });
 
-test("phase 2 does not mutate mastery, score review pass/fail, or advance the interval", () => {
+test("phase 2 generation remains pure even after later phases attach review scoring", () => {
   const lesson = getLessonById("home-f-j");
   const mastery = dueMastery();
   const snapshot = structuredClone(mastery);
@@ -119,7 +119,6 @@ test("phase 2 does not mutate mastery, score review pass/fail, or advance the in
   assert.deepEqual(mastery, snapshot);
 
   const sessionPage = source("pages/ReviewSessionPage.jsx");
-  assert.doesNotMatch(sessionPage, /recordSession|applyGuidedLessonResult|finaliseLessonMastery|calculateLessonMastery/);
   assert.match(sessionPage, /resultPassEvaluator=\{\(\) => true\}/);
 });
 

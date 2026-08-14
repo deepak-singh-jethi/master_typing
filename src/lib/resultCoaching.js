@@ -177,12 +177,12 @@ export function getPrimaryDiagnosis({
       tone: "indigo",
       code: transfer ? "spaced-review-transfer" : "spaced-review-recall",
       eyebrow: transfer ? "Fresh transfer captured" : "Cold recall captured",
-      title: transfer ? "The retention check has both stages" : "The first retention stage is complete",
+      title: transfer ? "Retention evidence captured" : "The first retention stage is complete",
       summary: transfer
-        ? `Fresh material was typed at ${Math.round(accuracy)}% accuracy. This stage checks the learned movement outside the first recall pattern.`
+        ? `Fresh material was typed at ${Math.round(accuracy)}% accuracy. The dedicated review now combines both stages before deciding whether the movement is retained or needs a refresh.`
         : `The movement was recalled at ${Math.round(accuracy)}% accuracy before any lesson replay or reteaching.`,
       action: transfer
-        ? "Finish the review practice. Scheduling and pass/fail decisions are intentionally handled in the next review phase."
+        ? "Open the combined review result to see whether the interval advances or targeted recovery is needed."
         : "Continue to fresh transfer so the same movement is checked in new curriculum-safe material.",
     };
   }

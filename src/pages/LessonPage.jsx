@@ -24,7 +24,6 @@ import {
 import {
   assessGuidedAttempt,
   finaliseLessonMastery,
-  getEffectiveMasteryState,
   getGuidedExerciseRequirements,
   isAdaptiveLessonUnlocked,
   MASTERY_RULE_VERSION,
@@ -75,9 +74,9 @@ function LessonPageContent({ lessonId }) {
     () => lesson ? data.progress.lessonMastery[lesson.id] ?? EMPTY_MASTERY : EMPTY_MASTERY,
     [data.progress.lessonMastery, lesson],
   );
-  const masteryState = getEffectiveMasteryState(currentMastery);
-  const [reviewAttempt] = useState(() => alreadyComplete
-    || [MASTERY_STATES.MASTERED, MASTERY_STATES.REVIEW_DUE].includes(masteryState));
+  // A completed lesson can still be revisited for practice, but it no longer counts
+  // as spaced-review evidence. Dedicated retention checks live under /review/:lessonId.
+  const reviewAttempt = false;
   const restoredSession = location.state?.lessonSession ?? null;
   const remediation = location.state?.remediation ?? null;
 

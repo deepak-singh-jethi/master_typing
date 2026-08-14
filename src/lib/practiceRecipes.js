@@ -98,6 +98,13 @@ function normaliseRemediationReturn(value) {
       },
     };
   }
+  if (value.kind === "review" && /^\/review\/[a-z0-9-]+\/session$/i.test(String(value.to || ""))) {
+    return {
+      kind: "review",
+      to: String(value.to),
+      label: String(value.label || "retention check").slice(0, 80),
+    };
+  }
   if (value.kind === "practice" && value.config && typeof value.config === "object") {
     return { kind: "practice", config: compactReassessmentConfig(value.config) };
   }
@@ -469,16 +476,16 @@ export function buildPracticeRecipe(config = {}, data = {}) {
 export function buildRecoveryConfig(result = {}, previousConfig = {}, context = {}) {
   const focusKeys = uniqueStrings(
     (result.difficultKeys ?? [])
-      .map((item) => normaliseKey(item.key))
+      .map((item) => normaliseKey(typeof item === "string" ? item : item?.key))
       .filter(Boolean),
   ).slice(0, 6);
   const focusBigrams = uniqueStrings(
     (result.difficultBigrams ?? [])
-      .map((item) => normaliseBigram(item.key))
+      .map((item) => normaliseBigram(typeof item === "string" ? item : item?.key))
       .filter((item) => item.length === 2),
   ).slice(0, 6);
   const recoveryWords = uniqueStrings(
-    (result.mistakeWords ?? []).map((item) => item.expected),
+    (result.mistakeWords ?? []).map((item) => typeof item === "string" ? item : item?.expected),
     { lower: true },
   ).slice(0, 12);
   const confusionPairs = [];

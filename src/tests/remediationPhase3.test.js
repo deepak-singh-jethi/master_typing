@@ -431,6 +431,6 @@ test("successful recovery exposes an explicit fresh-transfer action", () => {
   assert.match(source, /"Check transfer on fresh text"/);
   assert.match(source, /"Recheck original text"/);
   assert.match(source, /remediationStage: "reassessment"/);
-  assert.match(source, /\["test", "lesson"\]\.includes\(target\?\.kind\)/);
+  assert.match(source, /\["test", "lesson", "review"\]\.includes\(target\?\.kind\)/);
   assert.match(source, /target\?\.kind === "practice"/);
 });

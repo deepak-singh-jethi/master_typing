@@ -11,7 +11,7 @@ export const MASTERY_STATES = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const REVIEW_INTERVALS = [3, 7, 14, 30, 60];
+export const REVIEW_INTERVALS = Object.freeze([3, 7, 14, 30, 60]);
 export const MASTERY_RULE_VERSION = 2;
 
 function getLocalDateKey(date = new Date()) {
@@ -647,9 +647,9 @@ function matchingPlanAttempts(item, attempts = []) {
   }
   if (item.type === "review") {
     return attempts.filter((attempt) => (
-      ["lesson", "lesson-practice"].includes(attempt.type)
-      && attempt.lessonId === rule.lessonId
-      && attempt.reviewAttempt === true
+      attempt.lessonId === rule.lessonId
+      && (attempt.type === "spaced-review"
+        || (["lesson", "lesson-practice"].includes(attempt.type) && attempt.reviewAttempt === true))
     ));
   }
   if (item.type === "benchmark") {
@@ -734,7 +734,8 @@ export function buildDailyPlan(data = {}, nowValue = new Date()) {
   let remaining = goalMinutes;
 
   const previousReviewAttempt = [...todayAttempts].reverse().find((attempt) => (
-    attempt.reviewAttempt === true && attempt.lessonId
+    attempt.lessonId
+    && (attempt.type === "spaced-review" || attempt.reviewAttempt === true)
   ));
   const reviewLesson = reviews[0]?.lesson ?? getLessonById(previousReviewAttempt?.lessonId);
   const previousLessonAttempt = [...todayAttempts].reverse().find((attempt) => (
@@ -775,13 +776,13 @@ export function buildDailyPlan(data = {}, nowValue = new Date()) {
       id: `review-${reviewLesson.id}-${todayKey}`,
       type: "review",
       title: `Review: ${reviewLesson.title}`,
-      description: "Complete the review exercises and enough controlled practice to refresh the movement.",
-      minutes: Math.min(goalMinutes <= 5 ? 3 : 5, Math.max(2, remaining)),
-      to: `/learn/${reviewLesson.id}`,
+      description: "Run the short retention check. A pass advances the interval; a miss stays due for targeted recovery.",
+      minutes: Math.min(2, Math.max(1, remaining)),
+      to: `/review/${reviewLesson.id}`,
       completionRule: {
         lessonId: reviewLesson.id,
-        accuracyTarget: asNumber(reviewLesson.passAccuracy, 94),
-        durationThreshold: 0.8,
+        accuracyTarget: 95,
+        durationThreshold: 0.74,
       },
       priority: 10,
     });

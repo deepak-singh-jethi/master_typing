@@ -43,6 +43,8 @@ const SUMMARY_FIELDS = [
   "errorCount", "correctedErrors", "correctionActions", "deletedCharacters", "completion",
   "validSession", "benchmarkValid", "validBenchmark", "personalBestEligible", "isPersonalBest",
   "sessionPassed", "reviewAttempt", "accuracyTarget", "reason", "pauseCount",
+  "reviewPolicyVersion", "reviewSessionVersion", "reviewCycleId", "reviewOutcome",
+  "reviewAccuracyTarget", "reviewFocusErrorLimit", "reviewFocusErrorRate", "reviewNextIntervalDays",
   "focusLossCount", "rejectedEdits", "compositionCommits", "recipeVersion",
   "curriculumVersion", "contentVersion", "guidedStage",
   "masteryRuleVersion", "unseenTransfer", "reviewScope", "checkpointModuleId",

@@ -54,9 +54,11 @@ import {
   determineDiagnosticPlacement,
   finaliseLessonMastery,
   getDefaultPlacement,
+  getEffectiveMasteryState,
   getNextRecommendedLesson,
   MASTERY_STATES,
 } from "@/lib/adaptiveLearning";
+import { applySpacedReviewResult } from "@/lib/spacedReview";
 
 
 function getSystemTheme() {
@@ -705,7 +707,11 @@ export function AppProvider({ children }) {
       const testKey = session.testId || (session.type === "diagnostic" ? session.modeId : null);
       const previousBest = testKey ? current.personalBests[testKey] : null;
       const personalBestEligible = Boolean(session.personalBestEligible ?? session.validSession ?? true);
-      const scoreEligible = testKey ? personalBestEligible : session.validSession !== false;
+      const scoreEligible = testKey
+        ? personalBestEligible
+        : session.type === "spaced-review"
+          ? false
+          : session.validSession !== false;
       const isPersonalBest = Boolean(testKey)
         && personalBestEligible
         && (!previousBest || netWpm > previousBest.netWpm);
@@ -745,22 +751,47 @@ export function AppProvider({ children }) {
       if (session.type === "lesson" && session.practiceMode === "guided" && session.lessonId) {
         const lesson = getLessonById(session.lessonId);
         if (lesson) {
-          const updatedMastery = applyGuidedLessonResult(
+          const existingMastery = lessonMastery[session.lessonId] ?? {};
+          const existingState = getEffectiveMasteryState(existingMastery);
+          const alreadyMastered = Boolean(existingMastery.masteredAt)
+            || [MASTERY_STATES.MASTERED, MASTERY_STATES.REVIEW_DUE].includes(existingState);
+
+          // Reopening an old lesson is remediation/repractice, not spaced-review evidence.
+          // Only the dedicated review flow is allowed to move the retention schedule.
+          if (!alreadyMastered) {
+            const updatedMastery = applyGuidedLessonResult(
+              existingMastery,
+              { ...session, ...attempt },
+              lesson,
+              { baselineWpm: current.progress.averageWpm || netWpm },
+            );
+            lessonMastery = {
+              ...lessonMastery,
+              [session.lessonId]: updatedMastery,
+            };
+            if (
+              [MASTERY_STATES.MASTERED, MASTERY_STATES.REVIEW_DUE].includes(updatedMastery.state)
+              && !completedLessons.includes(session.lessonId)
+            ) {
+              completedLessons = [...completedLessons, session.lessonId];
+            }
+          }
+        }
+      }
+
+      if (session.type === "spaced-review" && session.lessonId) {
+        const lesson = getLessonById(session.lessonId);
+        if (lesson) {
+          const updatedMastery = applySpacedReviewResult(
             lessonMastery[session.lessonId] ?? {},
             { ...session, ...attempt },
             lesson,
-            { baselineWpm: current.progress.averageWpm || netWpm },
+            new Date(attempt.completedAt),
           );
           lessonMastery = {
             ...lessonMastery,
             [session.lessonId]: updatedMastery,
           };
-          if (
-            [MASTERY_STATES.MASTERED, MASTERY_STATES.REVIEW_DUE].includes(updatedMastery.state)
-            && !completedLessons.includes(session.lessonId)
-          ) {
-            completedLessons = [...completedLessons, session.lessonId];
-          }
         }
       }
 

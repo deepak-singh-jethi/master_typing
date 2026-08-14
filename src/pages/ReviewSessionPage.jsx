@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Check, Circle } from "lucide-react";
 import { TypingWorkspace } from "@/components/typing/TypingWorkspace";
 import { getLessonById } from "@/data/curriculum";
@@ -7,7 +7,9 @@ import { useApp } from "@/hooks/useApp";
 import { getNextRecommendedLesson } from "@/lib/adaptiveLearning";
 import {
   buildSpacedReviewEntryState,
+  buildSpacedReviewEvidence,
   buildSpacedReviewSessionPlan,
+  SPACED_REVIEW_ACCURACY_TARGET,
 } from "@/lib/spacedReview";
 import { cn } from "@/lib/utils";
 
@@ -15,38 +17,59 @@ const EMPTY_MASTERY = Object.freeze({});
 
 export function ReviewSessionPage() {
   const { lessonId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const { data } = useApp();
+  const { data, recordSession } = useApp();
   const lesson = getLessonById(lessonId);
   const mastery = lesson
     ? data.progress.lessonMastery?.[lesson.id] ?? EMPTY_MASTERY
     : EMPTY_MASTERY;
   const nextLesson = getNextRecommendedLesson(data);
   const entry = buildSpacedReviewEntryState({ lesson, mastery, nextLesson });
+  const remediation = location.state?.remediation ?? null;
+  const reviewVariant = remediation?.stage === "reassessment"
+    ? `reassessment:${remediation.chainId || "recovery"}`
+    : location.state?.reviewVariant ?? null;
   const [stageIndex, setStageIndex] = useState(0);
-  const [stageResults, setStageResults] = useState([]);
+  const stageResultsRef = useRef([]);
+  const latestReviewResultRef = useRef(null);
 
   const plan = useMemo(
-    () => buildSpacedReviewSessionPlan({ lesson, mastery }),
-    [lesson, mastery],
+    () => buildSpacedReviewSessionPlan({ lesson, mastery, variantKey: reviewVariant }),
+    [lesson, mastery, reviewVariant],
   );
 
   const stage = plan.stages[stageIndex] ?? null;
 
   const handleComplete = useCallback((result) => {
-    setStageResults((current) => {
-      const next = [...current];
-      next[stageIndex] = {
-        stageId: stage?.id ?? null,
-        accuracy: Number(result.keystrokeAccuracy ?? result.accuracy) || 0,
-        netWpm: Number(result.netWpm) || 0,
-        consistency: Number(result.consistency) || 0,
-        completion: Number(result.completion) || 0,
-        valid: result.validSession !== false && result.benchmarkValid !== false,
-      };
-      return next;
+    const nextResults = [...stageResultsRef.current];
+    nextResults[stageIndex] = result;
+    stageResultsRef.current = nextResults;
+
+    if (!lesson || stageIndex !== plan.stages.length - 1) return;
+
+    const reviewResult = buildSpacedReviewEvidence({
+      lesson,
+      mastery,
+      plan,
+      stageResults: nextResults,
+      completedAt: new Date(),
+      remediation,
     });
-  }, [stage?.id, stageIndex]);
+    if (!reviewResult) return;
+
+    latestReviewResultRef.current = reviewResult;
+    recordSession(reviewResult);
+    navigate(`/review/${lesson.id}`, {
+      replace: true,
+      state: {
+        reviewSessionCompleted: true,
+        reviewSessionVersion: plan.version,
+        reviewOutcome: reviewResult.reviewOutcome,
+        reviewResult,
+      },
+    });
+  }, [lesson, mastery, navigate, plan, recordSession, remediation, stageIndex]);
 
   const continueAfterStage = useCallback(() => {
     if (stageIndex < plan.stages.length - 1) {
@@ -55,15 +78,26 @@ export function ReviewSessionPage() {
       return;
     }
 
+    const reviewResult = latestReviewResultRef.current
+      ?? buildSpacedReviewEvidence({
+        lesson,
+        mastery,
+        plan,
+        stageResults: stageResultsRef.current,
+        completedAt: new Date(),
+        remediation,
+      });
+
     navigate(`/review/${lesson.id}`, {
       replace: true,
       state: {
         reviewSessionCompleted: true,
         reviewSessionVersion: plan.version,
-        stageResults,
+        reviewOutcome: reviewResult?.reviewOutcome ?? "needs-refresh",
+        reviewResult,
       },
     });
-  }, [lesson?.id, navigate, plan.stages.length, plan.version, stageIndex, stageResults]);
+  }, [lesson, mastery, navigate, plan, remediation, stageIndex]);
 
   if (!lesson || entry.status === "missing") {
     return <Navigate to="/learn" replace />;
@@ -81,6 +115,7 @@ export function ReviewSessionPage() {
     lessonTitle: lesson.title,
     stageIndex,
     totalStages: plan.stages.length,
+    reviewAccuracyTarget: SPACED_REVIEW_ACCURACY_TARGET,
   };
 
   return (
@@ -105,7 +140,7 @@ export function ReviewSessionPage() {
       countdownSeconds={stageIndex === 0 ? 3 : 2}
       onComplete={handleComplete}
       onContinue={continueAfterStage}
-      continueLabel={stageIndex < plan.stages.length - 1 ? "Continue to fresh transfer" : "Finish review practice"}
+      continueLabel={stageIndex < plan.stages.length - 1 ? "Continue to fresh transfer" : "See review result"}
       retryLabel="Retry this stage"
       resultContext={resultContext}
       sessionControls={<ReviewStageStrip stages={plan.stages} currentIndex={stageIndex} />}

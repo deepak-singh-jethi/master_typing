@@ -192,7 +192,7 @@ export function PracticeSessionPage() {
     }
 
     const target = config.remediationReturn;
-    if (["test", "lesson"].includes(target?.kind) && target.to) {
+    if (["test", "lesson", "review"].includes(target?.kind) && target.to) {
       navigate(target.to, {
         state: {
           remediation: {
