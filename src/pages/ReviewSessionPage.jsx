@@ -11,23 +11,25 @@ import {
 } from "@/lib/spacedReview";
 import { cn } from "@/lib/utils";
 
+const EMPTY_MASTERY = Object.freeze({});
+
 export function ReviewSessionPage() {
   const { lessonId } = useParams();
   const navigate = useNavigate();
   const { data } = useApp();
   const lesson = getLessonById(lessonId);
-  const mastery = lesson ? data.progress.lessonMastery?.[lesson.id] ?? {} : {};
+  const mastery = lesson
+    ? data.progress.lessonMastery?.[lesson.id] ?? EMPTY_MASTERY
+    : EMPTY_MASTERY;
   const nextLesson = getNextRecommendedLesson(data);
   const entry = buildSpacedReviewEntryState({ lesson, mastery, nextLesson });
   const [stageIndex, setStageIndex] = useState(0);
   const [stageResults, setStageResults] = useState([]);
 
-  const plan = useMemo(() => buildSpacedReviewSessionPlan({ lesson, mastery }), [
-    lesson,
-    mastery.dueAt,
-    mastery.reviewCount,
-    mastery.reviewIntervalDays,
-  ]);
+  const plan = useMemo(
+    () => buildSpacedReviewSessionPlan({ lesson, mastery }),
+    [lesson, mastery],
+  );
 
   const stage = plan.stages[stageIndex] ?? null;
 
