@@ -125,8 +125,9 @@ test("the core learning path explains placement credit and links course progress
   const sidebar = source("components/layout/Sidebar.jsx");
   assert.match(learn, />PLACEMENT CREDIT</);
   assert.match(learn, /placement credits/);
-  assert.match(sidebar, /<Link to="\/learn"/);
-  assert.match(sidebar, /Open learning path/);
+  assert.match(sidebar, /<Link\s+to="\/learn"/);
+  assert.match(sidebar, /View course map/);
+  assert.match(sidebar, /CourseArc/);
 });
 
 test("lesson practice options remain accessible without displacing the focused typing workspace", () => {
