@@ -59,8 +59,8 @@ test("focused lesson routes use the wider distraction-reduced shell", () => {
   assert.match(header, /focusedLesson/);
   assert.match(header, /max-w-\[1360px\]/);
   assert.match(sidebar, /Course progress/);
-  assert.match(sidebar, /Current streak/);
-  assert.match(sidebar, /Daily goal/);
+  assert.doesNotMatch(sidebar, /Current streak/);
+  assert.doesNotMatch(sidebar, /Daily goal/);
 });
 
 test("guided result screen still prioritises accuracy and gives an explicit next step", () => {
