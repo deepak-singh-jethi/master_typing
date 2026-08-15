@@ -3,7 +3,6 @@ import {
   ArrowRight,
   BookOpen,
   BrainCircuit,
-  CalendarDays,
   CheckCircle2,
   Clock3,
   Flame,
@@ -92,7 +91,7 @@ export function DashboardPage() {
         </div>
       </section>
 
-      <section aria-label="Today's progress" className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)]">
+      <section aria-label="Today's progress">
         <TodayGlance
           minutes={todayMinutes}
           goalMinutes={data.settings.dailyGoalMinutes}
@@ -101,7 +100,6 @@ export function DashboardPage() {
           streak={data.progress.currentStreak}
           goalComplete={dailyGoalComplete}
         />
-        <StreakCalendar dailyActivity={data.statistics.dailyActivity} />
       </section>
     </div>
   );
@@ -388,51 +386,6 @@ function GlanceMetric({ icon: Icon, tone, value, label, badge }) {
   );
 }
 
-function StreakCalendar({ dailyActivity = {} }) {
-  const days = getRecentCalendarDays(14);
-  const todayKey = getLocalDateKey();
-  const activeDays = days.filter((day) => Number(dailyActivity?.[day.key]?.seconds) > 0).length;
-
-  return (
-    <Card as="section" aria-labelledby="streak-calendar-title" className="p-5 sm:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <CalendarDays className="size-5 text-slate-500 dark:text-slate-400" aria-hidden="true" />
-            <h2 id="streak-calendar-title" className="text-base font-semibold text-slate-950 dark:text-white">Streak calendar</h2>
-          </div>
-          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-            {activeDays > 0 ? `${activeDays} active day${activeDays === 1 ? "" : "s"} in the last two weeks.` : "Your recent practice days will appear here. Consistency builds mastery."}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 grid grid-cols-7 gap-2" aria-label="Last 14 days of practice">
-        {days.map((day) => {
-          const active = Number(dailyActivity?.[day.key]?.seconds) > 0;
-          const current = day.key === todayKey;
-          return (
-            <div key={day.key} className="text-center">
-              <p className="text-[10px] font-semibold uppercase text-slate-400">{day.weekday}</p>
-              <span
-                className={cn(
-                  "mx-auto mt-1.5 grid size-8 place-items-center rounded-full border text-xs font-semibold",
-                  active && "border-indigo-200 bg-indigo-100 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200",
-                  !active && "border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400",
-                  current && !active && "border-indigo-300 text-indigo-600 dark:border-indigo-500/50 dark:text-indigo-300",
-                )}
-                title={`${day.label}${active ? " · practised" : ""}${current ? " · today" : ""}`}
-              >
-                {day.date}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
-
 function HeroMetric({ value, label, icon: Icon }) {
   return (
     <div className="min-w-0">
@@ -471,26 +424,6 @@ function ProgressRing({ value }) {
       <span className="absolute inset-0 grid place-items-center text-xs font-bold text-slate-800 dark:text-slate-100">{Math.round(safeValue)}%</span>
     </div>
   );
-}
-
-function getRecentCalendarDays(count) {
-  const days = [];
-  const cursor = new Date();
-  cursor.setHours(12, 0, 0, 0);
-  cursor.setDate(cursor.getDate() - (count - 1));
-
-  for (let index = 0; index < count; index += 1) {
-    const date = new Date(cursor);
-    days.push({
-      key: getLocalDateKey(date),
-      date: date.getDate(),
-      weekday: date.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 1),
-      label: date.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-    });
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return days;
 }
 
 function formatKeyLabel(key) {

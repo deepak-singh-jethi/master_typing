@@ -1,14 +1,10 @@
 import { Link, NavLink } from "react-router-dom";
-import { Flame, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { navigationItems } from "@/components/layout/navigation";
 import { useApp } from "@/hooks/useApp";
 import { getCourseProgress } from "@/lib/adaptiveLearning";
 import { cn } from "@/lib/utils";
-
-function localDateKey(date = new Date()) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
 
 function CourseArc({ value }) {
   const progress = Math.min(100, Math.max(0, Number(value) || 0));
@@ -41,11 +37,6 @@ export function Sidebar() {
   const { data, resolvedTheme, updateSettings } = useApp();
   const course = getCourseProgress(data);
   const courseProgress = course.percentage;
-  const today = data.statistics.dailyActivity?.[localDateKey()] ?? {};
-  const todayMinutes = Math.round((Number(today.seconds) || 0) / 60);
-  const goalMinutes = Number(data.settings.dailyGoalMinutes) || 15;
-  const goalComplete = todayMinutes >= goalMinutes;
-  const streak = Math.max(0, Number(data.progress.currentStreak) || 0);
   const totalLessons = course.totalLessons || 27;
   const masteredLessons = data.progress.completedLessons.length;
 
@@ -91,38 +82,6 @@ export function Sidebar() {
           </div>
         </Link>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-[#0a1422]">
-          <div className="px-4 py-3.5">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-              <Flame className="size-4 text-orange-500" aria-hidden="true" />
-              Current streak
-            </div>
-            <p className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">{streak} {streak === 1 ? "day" : "days"}</p>
-            <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[9px] font-medium text-slate-400" aria-label="Current week">
-              {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => (
-                <div key={`${day}-${index}`}>
-                  <span>{day}</span>
-                  <span className={cn(
-                    "mx-auto mt-2 block size-2 rounded-full",
-                    index === new Date().getDay()
-                      ? "bg-violet-500 ring-4 ring-violet-500/10"
-                      : "bg-slate-200 dark:bg-slate-700",
-                  )} />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="border-t border-slate-200 px-4 py-3.5 dark:border-slate-800">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Daily goal</p>
-            <p className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">{todayMinutes} / {goalMinutes} min</p>
-            <p className={cn(
-              "mt-2 text-xs font-semibold",
-              goalComplete ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400",
-            )}>
-              {goalComplete ? "✓ Completed" : `${Math.max(0, goalMinutes - todayMinutes)} min remaining`}
-            </p>
-          </div>
-        </div>
 
         <button
           type="button"

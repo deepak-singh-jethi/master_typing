@@ -21,9 +21,10 @@ test("Home exposes one clear lesson entry plus three secondary quick actions", (
   assert.doesNotMatch(source, /What do you want to do\?/);
 });
 
-test("Home keeps glance metrics and the practice calendar but omits the rejected activity chart and motivational strip", () => {
+test("Home keeps compact glance metrics and omits duplicate calendar or motivational widgets", () => {
   assert.match(source, /Today at a glance/);
-  assert.match(source, /Streak calendar/);
+  assert.doesNotMatch(source, /Streak calendar/);
+  assert.doesNotMatch(source, /Last 14 days of practice/);
   assert.doesNotMatch(source, /Daily goal 15 min/);
   assert.doesNotMatch(source, /Small daily progress leads to big improvement/);
 });

@@ -14,8 +14,9 @@ test("desktop app uses one half-circle course sidebar on every AppShell route", 
   assert.match(sidebar, /function CourseArc/);
   assert.match(sidebar, /Course progress/);
   assert.match(sidebar, /View course map/);
-  assert.match(sidebar, /Current streak/);
-  assert.match(sidebar, /Daily goal/);
+  assert.doesNotMatch(sidebar, /Current streak/);
+  assert.doesNotMatch(sidebar, /Daily goal/);
+  assert.doesNotMatch(sidebar, /Current week/);
   assert.match(sidebar, /Dark mode/);
 
   // There must not be a route-specific compact sidebar variant anymore.
